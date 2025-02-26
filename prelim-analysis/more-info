@@ -1,0 +1,27 @@
+	1.	RIAGENDR – Gender
+	•	1 = Male
+	•	2 = Female
+	2.	RIDSTATR – Interview/Examination Status
+	•	1 = Interviewed only
+	•	2 = Both interviewed and examined
+	3.	DMDHRBR4 – Race/Ethnicity
+	•	1 = Mexican American
+	•	2 = Other Hispanic
+	•	3 = Non-Hispanic White
+	•	4 = Non-Hispanic Black
+	•	5 = Other Race - Including Multi-Racial
+	4.	DMDHREDU – Education Level (Adults 20+ years old)
+	•	1 = Less than 9th grade
+	•	2 = 9-11th grade (Includes 12th grade with no diploma)
+	•	3 = High school graduate/GED or equivalent
+	•	4 = Some college or AA degree
+	•	5 = College graduate or above
+	5.	DMDHRMAR – Marital Status
+	•	1 = Married
+	•	2 = Widowed
+	•	3 = Divorced
+	•	4 = Separated
+	•	5 = Never married
+	•	6 = Living with partner
+	•	77 = Refused
+	•	99 = Don’t know
