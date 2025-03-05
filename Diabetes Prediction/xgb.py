@@ -1,11 +1,10 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix
+import xgboost as xgb
+import torch
 
 # Check for Metal Performance Shaders on mac
 device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
@@ -64,32 +63,25 @@ print(nan_counts[nan_counts > 0])
 # Target variable (diabetes status based on LBXGLU)
 y = merged_data['diabetes_status'].values  # Convert to integer labels
 
-# Standardize the features (important for neural network training)
+# Standardize the features (important for many ML algorithms, including XGBoost)
 scaler = StandardScaler()
 features_scaled = scaler.fit_transform(features)
 
-# Define the MLP model with Dropout for regularization
-class MLP(nn.Module):
-    def __init__(self, input_size, hidden_size=1024, output_size=3):
-        super(MLP, self).__init__()
-        self.layer_1 = nn.Linear(input_size, hidden_size)
-        self.relu = nn.ReLU()
-        self.layer_2 = nn.Linear(hidden_size, hidden_size)
-        self.layer_3 = nn.Linear(hidden_size, hidden_size)  # Additional hidden layer
-        self.output_layer = nn.Linear(hidden_size, output_size)
-        self.softmax = nn.Softmax(dim=1)
-
-    def forward(self, x):
-        x = self.relu(self.layer_1(x))
-        x = self.relu(self.layer_2(x))
-        x = self.relu(self.layer_3(x))  # Additional hidden layer
-        x = self.output_layer(x)
-        return self.softmax(x)
-
 # Cross-validation procedure
-def cross_validate_model(X, y, n_splits=5, epochs=100, batch_size=32):
+def cross_validate_model(X, y, n_splits=5):
     kfold = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
     accuracies = []
+
+    # XGBoost parameters (feel free to tweak these)
+    params = {
+        'objective': 'multi:softmax',  # multi-class classification
+        'num_class': 3,  # Number of classes (0, 1, 2)
+        'eval_metric': 'mlogloss',  # Log loss as the evaluation metric
+        'max_depth': 6,  # Maximum depth of the trees
+        'learning_rate': 0.1,  # Learning rate
+        'subsample': 0.8,  # Subsample ratio of the training instances
+        'colsample_bytree': 0.8  # Subsample ratio of features
+    }
 
     for fold, (train_idx, val_idx) in enumerate(kfold.split(X, y)):
         print(f"Fold {fold+1}/{n_splits}")
@@ -98,41 +90,29 @@ def cross_validate_model(X, y, n_splits=5, epochs=100, batch_size=32):
         X_train, X_val = X[train_idx], X[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        # Convert to PyTorch tensors
-        X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
-        X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
-        y_train_tensor = torch.tensor(y_train, dtype=torch.long)  # for classification (long type)
-        y_val_tensor = torch.tensor(y_val, dtype=torch.long)
+        # Convert data to DMatrix (XGBoost's internal data structure)
+        dtrain = xgb.DMatrix(X_train, label=y_train)
+        dval = xgb.DMatrix(X_val, label=y_val)
 
-        # Instantiate the model
-        input_size = X_train.shape[1]  # Number of features
-        model = MLP(input_size)
+        # Train the XGBoost model
+        model = xgb.train(params, dtrain, num_boost_round=100)
 
-        # Define the loss function and optimizer
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
+        # Validate the model
+        y_pred = model.predict(dval)
+        y_pred = np.round(y_pred)  # Round predictions to nearest integer (class)
 
-        # Training loop for this fold
-        for epoch in range(epochs):
-            model.train()
-            optimizer.zero_grad()
-            outputs = model(X_train_tensor)
-            loss = criterion(outputs, y_train_tensor)
-            loss.backward()
-            optimizer.step()
+        # Calculate accuracy for this fold
+        accuracy = accuracy_score(y_val, y_pred)
+        accuracies.append(accuracy)
+        print(f"Validation Accuracy for Fold {fold+1}: {accuracy:.4f}")
 
-        # Validation loop for this fold
-        model.eval()
-        with torch.no_grad():
-            val_outputs = model(X_val_tensor)
-            _, predicted = torch.max(val_outputs, 1)
-            accuracy = accuracy_score(y_val, predicted)
-            accuracies.append(accuracy)
-            print(f"Validation Accuracy for Fold {fold+1}: {accuracy:.4f}")
+        # Display confusion matrix for fold to understand predictions better
+        print("Confusion Matrix for Fold", fold+1)
+        print(confusion_matrix(y_val, y_pred))
 
     # Print final average accuracy across all folds
     print(f"\nAverage Cross-Validation Accuracy: {np.mean(accuracies):.4f}")
     return accuracies
 
 # Call the function to perform cross-validation
-accuracies = cross_validate_model(features_scaled, y, n_splits=5, epochs=100)
+accuracies = cross_validate_model(features_scaled, y, n_splits=5)
