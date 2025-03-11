@@ -5,20 +5,22 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 
 # Check for Metal Performance Shaders on mac
 device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
 
-# Read the accelerometry and glucose data
+# Read the accelerometry, glucose, and diet data
 acc_data = pd.read_csv("processed_data_new/nhanes_combined_acc.csv")  # Accelerometry data
 glu_data = pd.read_csv("processed_data_new/nhanes_combined_glu.csv")  # Plasma fasting glucose
+diet_data = pd.read_csv("processed_data_new/filled_nhanes_combined_diet.csv")  # Diet data
 
 # Drop unnecessary columns from glu_data (including diabetes_status if present)
 glu_data = glu_data.drop(columns=['diabetes_status'], axis=1, errors='ignore')
 
-# Merge the accelerometry data with glucose data on 'SEQN' (subject identifier)
+# Merge accelerometry, glucose, and diet data on 'SEQN' (subject identifier)
 merged_data = pd.merge(acc_data, glu_data, on='SEQN', how='inner')
+merged_data = pd.merge(merged_data, diet_data, on='SEQN', how='inner')
 
 # Handle missing values in the LBXGLU column for the target variable (diabetes status)
 merged_data['LBXGLU'] = merged_data['LBXGLU'].fillna(0)  # Or choose another strategy like mean or median
@@ -34,7 +36,7 @@ merged_data['diabetes_status'] = merged_data['diabetes_status'].fillna(0)  # Def
 # Ensure the 'diabetes_status' column is of integer type
 merged_data['diabetes_status'] = merged_data['diabetes_status'].astype(int)
 
-# Define input features (only accelerometry columns, no LBXGLU)
+# Define input features (include both accelerometry and diet columns)
 # Drop non-numeric columns like 'SEQN', 'LBXGLU', and 'diabetes_status'
 features = merged_data.drop(columns=['SEQN', 'LBXGLU', 'diabetes_status'])
 
@@ -47,14 +49,10 @@ all_nan_columns = features.columns[features.isna().all()].tolist()
 if all_nan_columns:
     print(f"Columns with all NaN values: {all_nan_columns}")
     features = features.drop(columns=all_nan_columns)  # Drop columns with all NaN values
-    # Columns related to glucose
-    features = features.drop(columns=['LBDGLUSI', 'WTSAF2YR', 'PHAFSTHR', 'PHAFSTMN'])
 
-# Handle NaN values in accelerometry columns by filling with column mean
+# Handle NaN values in the columns by filling with column mean
 features.fillna(features.mean(), inplace=True)  # Fill NaNs with mean of each column
 print(features.head())
-
-print("Features used to predict diabetes: " + features.columns)
 
 # Check again for NaN values after filling
 nan_counts = features.isna().sum()
@@ -90,6 +88,8 @@ class MLP(nn.Module):
 def cross_validate_model(X, y, n_splits=5, epochs=100, batch_size=32):
     kfold = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
     accuracies = []
+    f1_scores = []
+    auc_scores = []
 
     for fold, (train_idx, val_idx) in enumerate(kfold.split(X, y)):
         print(f"Fold {fold+1}/{n_splits}")
@@ -106,7 +106,7 @@ def cross_validate_model(X, y, n_splits=5, epochs=100, batch_size=32):
 
         # Instantiate the model
         input_size = X_train.shape[1]  # Number of features
-        model = MLP(input_size)
+        model = MLP(input_size).to(device)
 
         # Define the loss function and optimizer
         criterion = nn.CrossEntropyLoss()
@@ -116,23 +116,37 @@ def cross_validate_model(X, y, n_splits=5, epochs=100, batch_size=32):
         for epoch in range(epochs):
             model.train()
             optimizer.zero_grad()
-            outputs = model(X_train_tensor)
-            loss = criterion(outputs, y_train_tensor)
+            outputs = model(X_train_tensor.to(device))
+            loss = criterion(outputs, y_train_tensor.to(device))
             loss.backward()
             optimizer.step()
 
         # Validation loop for this fold
         model.eval()
         with torch.no_grad():
-            val_outputs = model(X_val_tensor)
+            val_outputs = model(X_val_tensor.to(device))
             _, predicted = torch.max(val_outputs, 1)
+            
+            # Move the predictions to the CPU before using them in sklearn functions
+            predicted = predicted.cpu().numpy()
+            
             accuracy = accuracy_score(y_val, predicted)
-            accuracies.append(accuracy)
-            print(f"Validation Accuracy for Fold {fold+1}: {accuracy:.4f}")
+            f1 = f1_score(y_val, predicted, average='weighted')
+            auc = roc_auc_score(y_val, val_outputs.cpu().numpy(), multi_class='ovr', average='weighted')
 
-    # Print final average accuracy across all folds
+            accuracies.append(accuracy)
+            f1_scores.append(f1)
+            auc_scores.append(auc)
+
+            print(f"Validation Accuracy for Fold {fold+1}: {accuracy:.4f}")
+            print(f"Validation F1 Score for Fold {fold+1}: {f1:.4f}")
+            print(f"Validation AUC Score for Fold {fold+1}: {auc:.4f}")
+
+    # Print final average metrics across all folds
     print(f"\nAverage Cross-Validation Accuracy: {np.mean(accuracies):.4f}")
-    return accuracies
+    print(f"Average Cross-Validation F1 Score: {np.mean(f1_scores):.4f}")
+    print(f"Average Cross-Validation AUC Score: {np.mean(auc_scores):.4f}")
+    return accuracies, f1_scores, auc_scores
 
 # Call the function to perform cross-validation
-accuracies = cross_validate_model(features_scaled, y, n_splits=5, epochs=100)
+accuracies, f1_scores, auc_scores = cross_validate_model(features_scaled, y, n_splits=5, epochs=100)
