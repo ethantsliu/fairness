@@ -1,4 +1,4 @@
-###### Exploring Fairness and Explainability in Multimodal Machine Learning Models 
+### Exploring Fairness and Explainability in Multimodal Machine Learning Models 
 
 Exploring Fairness and Explainability in Multimodal Machine Learning Models Fusing Fitbit and Health Record Data Streams is a project focused on building predictive models using data from the All of Us Research Program (AOU), NHANES, and the MIMIC-IV clinical and waveform datasets. The goal is to improve the accuracy and fairness of machine learning models used in healthcare, particularly in predicting cardiovascular and metabolic conditions using multimodal data streams that include wearable-derived features such as PPG, SpO₂, and non-invasive blood pressure. The project addresses known biases in wearable technology, such as decreased sensor reliability in individuals with darker skin tones, while also advancing model transparency and generalizability.
 
