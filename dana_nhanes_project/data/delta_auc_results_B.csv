@@ -1,0 +1,34 @@
+Comparison,ΔAUC,ΔAUC 95% CI,Base AUC,With Accel AUC
+ΔAUC((PCE + Self Reported Physical Activity) − (PCE)),0.0,"[np.float64(-0.08029921543457608), np.float64(0.08049730508050501)]",0.6819,0.6819
+ΔAUC((PCE + Accel) − (PCE)),0.0049,"[np.float64(-0.07457043942204888), np.float64(0.08382637596723053)]",0.6819,0.6868
+ΔAUC((PCE + Accel Various) − (PCE)),0.0009,"[np.float64(-0.07765205351841786), np.float64(0.0807617128417224)]",0.6819,0.6828
+ΔAUC((SCORE + Self Reported Physical Activity) − (SCORE)),-0.0,"[np.float64(-0.07792412904796919), np.float64(0.07725933896456971)]",0.6421,0.6421
+ΔAUC((SCORE + Accel) − (SCORE)),0.0009,"[np.float64(-0.0780392508951937), np.float64(0.07640875879851661)]",0.6421,0.643
+ΔAUC((SCORE + Accel Various) − (SCORE)),-0.0026,"[np.float64(-0.08113809264308758), np.float64(0.07459088724805141)]",0.6421,0.6395
+ΔAUC((LE8 + Self Reported Physical Activity) − (LE8)),0.0,"[np.float64(-0.07846650174110659), np.float64(0.07812722100952185)]",0.6406,0.6406
+ΔAUC((LE8 + Accel) − (LE8)),0.0052,"[np.float64(-0.07341493175764946), np.float64(0.08245242839114908)]",0.6406,0.6458
+ΔAUC((LE8 + Accel Various) − (LE8)),-0.0018,"[np.float64(-0.07952658621069231), np.float64(0.07579827984200616)]",0.6406,0.6388
+ΔAUC((Demographics + Self Reported Physical Activity) − (Demographics)),0.0097,"[np.float64(-0.07455637837340684), np.float64(0.09246595965950438)]",0.5322,0.5419
+ΔAUC((Demographics + Accel) − (Demographics)),0.0586,"[np.float64(-0.025265323336833623), np.float64(0.1398662174105712)]",0.5322,0.5908
+ΔAUC((Demographics + Accel Various) − (Demographics)),0.0581,"[np.float64(-0.026950019232973355), np.float64(0.14305127340955986)]",0.5322,0.5903
+ΔAUC((SDOH + Self Reported Physical Activity) − (SDOH)),-0.0003,"[np.float64(-0.07966361694473001), np.float64(0.07903409498136038)]",0.6224,0.6222
+ΔAUC((SDOH + Accel) − (SDOH)),0.0081,"[np.float64(-0.07197624531966895), np.float64(0.08830605096145605)]",0.6224,0.6306
+ΔAUC((SDOH + Accel Various) − (SDOH)),0.0039,"[np.float64(-0.07522906333375401), np.float64(0.0858000423017623)]",0.6224,0.6264
+ΔAUC((PCE_Clinic_Free + Self Reported Physical Activity) − (PCE_Clinic_Free)),0.0021,"[np.float64(-0.07981376042149357), np.float64(0.0841906092224739)]",0.5929,0.595
+ΔAUC((PCE_Clinic_Free + Accel) − (PCE_Clinic_Free)),0.0179,"[np.float64(-0.06297522746218076), np.float64(0.10063897476284489)]",0.5929,0.6108
+ΔAUC((PCE_Clinic_Free + Accel Various) − (PCE_Clinic_Free)),0.0055,"[np.float64(-0.07629163793732363), np.float64(0.08977682152135058)]",0.5929,0.5985
+ΔAUC((SCORE_Clinic_Free + Self Reported Physical Activity) − (SCORE_Clinic_Free)),0.003,"[np.float64(-0.08024126095435768), np.float64(0.0878305331575937)]",0.5739,0.5768
+ΔAUC((SCORE_Clinic_Free + Accel) − (SCORE_Clinic_Free)),0.0224,"[np.float64(-0.05914609387838676), np.float64(0.1071688986492364)]",0.5739,0.5963
+ΔAUC((SCORE_Clinic_Free + Accel Various) − (SCORE_Clinic_Free)),0.0155,"[np.float64(-0.06782122440319815), np.float64(0.10033746378433639)]",0.5739,0.5893
+ΔAUC((LE8_Clinic_Free + Self Reported Physical Activity) − (LE8_Clinic_Free)),0.0007,"[np.float64(-0.08201604701605525), np.float64(0.08445350660077589)]",0.5668,0.5675
+ΔAUC((LE8_Clinic_Free + Accel) − (LE8_Clinic_Free)),0.0313,"[np.float64(-0.05074713637012118), np.float64(0.11424485973379883)]",0.5668,0.5981
+ΔAUC((LE8_Clinic_Free + Accel Various) − (LE8_Clinic_Free)),0.0294,"[np.float64(-0.05244099518408729), np.float64(0.11323087054873526)]",0.5668,0.5962
+ΔAUC((PCE_Reasonable_Clinic_Free + Self Reported Physical Activity) − (PCE_Reasonable_Clinic_Free)),-0.0,"[np.float64(-0.08302488058352298), np.float64(0.08383642613772246)]",0.5883,0.5882
+ΔAUC((PCE_Reasonable_Clinic_Free + Accel) − (PCE_Reasonable_Clinic_Free)),0.0198,"[np.float64(-0.060335997075077086), np.float64(0.10266586339991424)]",0.5883,0.608
+ΔAUC((PCE_Reasonable_Clinic_Free + Accel Various) − (PCE_Reasonable_Clinic_Free)),0.0112,"[np.float64(-0.07116557241946864), np.float64(0.09538290690164097)]",0.5883,0.5994
+ΔAUC((SCORE_Reasonable_Clinic_Free + Self Reported Physical Activity) − (SCORE_Reasonable_Clinic_Free)),0.0001,"[np.float64(-0.08143879448164726), np.float64(0.08218771638858735)]",0.5644,0.5645
+ΔAUC((SCORE_Reasonable_Clinic_Free + Accel) − (SCORE_Reasonable_Clinic_Free)),0.0258,"[np.float64(-0.05432924134471362), np.float64(0.1084218666023451)]",0.5644,0.5903
+ΔAUC((SCORE_Reasonable_Clinic_Free + Accel Various) − (SCORE_Reasonable_Clinic_Free)),0.0182,"[np.float64(-0.06236839998494714), np.float64(0.10171567298891226)]",0.5644,0.5826
+ΔAUC((LE8_Reasonable_Clinic_Free + Self Reported Physical Activity) − (LE8_Reasonable_Clinic_Free)),0.0012,"[np.float64(-0.08121779981544863), np.float64(0.08440755316657622)]",0.5795,0.5807
+ΔAUC((LE8_Reasonable_Clinic_Free + Accel) − (LE8_Reasonable_Clinic_Free)),0.0224,"[np.float64(-0.05882560515189972), np.float64(0.1065203521131366)]",0.5795,0.6019
+ΔAUC((LE8_Reasonable_Clinic_Free + Accel Various) − (LE8_Reasonable_Clinic_Free)),0.0206,"[np.float64(-0.059414929161018426), np.float64(0.1028533256171239)]",0.5795,0.6002

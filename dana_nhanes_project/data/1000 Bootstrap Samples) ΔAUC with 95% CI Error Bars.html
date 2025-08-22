@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bootstrap ΔAUC Analysis</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-error-bars/3.0.0/chartjs-plugin-error-bars.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .figure {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .figure-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 25px;
+            color: #2c3e50;
+            text-align: center;
+            line-height: 1.4;
+        }
+        .chart-container {
+            position: relative;
+            height: 500px;
+            margin: 20px 0;
+        }
+        .chart-container-large {
+            height: 700px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            border-left: 4px solid;
+        }
+        .stat-card.split-a { border-color: #e74c3c; }
+        .stat-card.split-b { border-color: #3498db; }
+        .stat-card.split-c { border-color: #2ecc71; }
+        .stat-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .stat-value {
+            font-size: 14px;
+            margin: 5px 0;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align: center; color: #2c3e50; margin-bottom: 10px;">
+            Bootstrap Analysis: ΔAUC with 95% Confidence Intervals
+        </h1>
+        <p style="text-align: center; color: #6c757d; font-size: 16px; margin-bottom: 30px;">
+            Impact of Accelerometer Data (1000 Bootstrap Samples)
+        </p>
+        
+        <!-- Figure 1: Error Bar Chart -->
+        <div class="figure">
+            <div class="figure-title">
+                Impact of Accelerometer Data (1000 Bootstrap Samples) ΔAUC with 95% CI Error Bars<br>
+                
+            </div>
+            <div class="chart-container chart-container-large">
+                <canvas id="errorBarChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Summary Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card split-a">
+                <div class="stat-title" style="color: #e74c3c;">Split A</div>
+                <div class="stat-value">Max ΔAUC: 0.0917</div>
+                <div class="stat-value">Significant: 3/12</div>
+                <div class="stat-value">Best: LE8 + Demo + Accel</div>
+            </div>
+            <div class="stat-card split-b">
+                <div class="stat-title" style="color: #3498db;">Split B</div>
+                <div class="stat-value">Max ΔAUC: 0.1067</div>
+                <div class="stat-value">Significant: 4/12</div>
+                <div class="stat-value">Best: LE8 + Demo + SDOH + Accel</div>
+            </div>
+            <div class="stat-card split-c">
+                <div class="stat-title" style="color: #2ecc71;">Split C</div>
+                <div class="stat-value">Max ΔAUC: 0.0999</div>
+                <div class="stat-value">Significant: 1/12</div>
+                <div class="stat-value">Best: LE8 + Demo + SDOH + Accel</div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #e74c3c;"></div>
+                <span>Split A (Train 2013-14 / Test 2011-12)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #3498db;"></div>
+                <span>Split B (Train 2011-12 / Test 2013-14)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #2ecc71;"></div>
+                <span>Split C (80/20 Stratified Split)</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Custom error bar and zero line plugin
+        const errorBarPlugin = {
+            id: 'errorBarsAndZeroLine',
+            afterDatasetsDraw: function(chart) {
+                const ctx = chart.ctx;
+                const yScale = chart.scales.y;
+                const xScale = chart.scales.x;
+                
+                // Draw zero reference line first (behind error bars)
+                ctx.save();
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]);
+                
+                const zeroY = yScale.getPixelForValue(0);
+                const chartArea = chart.chartArea;
+                
+                ctx.beginPath();
+                ctx.moveTo(chartArea.left, zeroY);
+                ctx.lineTo(chartArea.right, zeroY);
+                ctx.stroke();
+                ctx.restore();
+                
+                // Draw error bars for all splits
+                Object.keys(bootstrapData).forEach((splitKey, splitIndex) => {
+                    const dataset = chart.data.datasets[splitIndex];
+                    const datasetMeta = chart.getDatasetMeta(splitIndex);
+                    const data = bootstrapData[splitKey];
+                    
+                    ctx.save();
+                    ctx.strokeStyle = dataset.borderColor;
+                    ctx.lineWidth = 1.5;
+                    ctx.lineCap = 'round';
+                    
+                    datasetMeta.data.forEach((bar, index) => {
+                        const dataPoint = data[index];
+                        const x = bar.x;
+                        
+                        // Calculate positions for error bars
+                        const yUpper = yScale.getPixelForValue(dataPoint.ciUpper);
+                        const yLower = yScale.getPixelForValue(dataPoint.ciLower);
+                        const yCenter = yScale.getPixelForValue(dataPoint.deltaAUC);
+                        
+                        // Draw vertical line (main error bar)
+                        ctx.beginPath();
+                        ctx.moveTo(x, yLower);
+                        ctx.lineTo(x, yUpper);
+                        ctx.stroke();
+                        
+                        // Draw caps (horizontal lines at top and bottom)
+                        const capWidth = 8;
+                        
+                        // Upper cap
+                        ctx.beginPath();
+                        ctx.moveTo(x - capWidth, yUpper);
+                        ctx.lineTo(x + capWidth, yUpper);
+                        ctx.stroke();
+                        
+                        // Lower cap
+                        ctx.beginPath();
+                        ctx.moveTo(x - capWidth, yLower);
+                        ctx.lineTo(x + capWidth, yLower);
+                        ctx.stroke();
+                    });
+                    
+                    ctx.restore();
+                });
+            }
+        };
+
+        // Register the plugin
+        Chart.register(errorBarPlugin);
+
+        // Bootstrap Data
+        const bootstrapData = {
+            splitA: [
+                {comparison: "PCE + Accel", deltaAUC: 0.002852, ciLower: -0.055196, ciUpper: 0.060710},
+                {comparison: "PCE + SDOH + Accel", deltaAUC: 0.006630, ciLower: -0.050990, ciUpper: 0.062959},
+                {comparison: "SCORE + Accel", deltaAUC: 0.003552, ciLower: -0.053258, ciUpper: 0.061042},
+                {comparison: "SCORE + SDOH + Accel", deltaAUC: 0.009718, ciLower: -0.047146, ciUpper: 0.066841},
+                {comparison: "LE8 + Accel", deltaAUC: 0.006159, ciLower: -0.061979, ciUpper: 0.075291},
+                {comparison: "LE8 + Demo + Accel", deltaAUC: 0.091668, ciLower: 0.028355, ciUpper: 0.153222},
+                {comparison: "LE8 + SDOH + Accel", deltaAUC: 0.057237, ciLower: -0.008119, ciUpper: 0.125014},
+                {comparison: "LE8 + SDOH + Demo + Accel", deltaAUC: 0.086930, ciLower: 0.023595, ciUpper: 0.149699},
+                {comparison: "Demo + Accel", deltaAUC: 0.005031, ciLower: -0.053252, ciUpper: 0.064045},
+                {comparison: "Demo + SDOH + Accel (vs Demo)", deltaAUC: 0.012344, ciLower: -0.047173, ciUpper: 0.071314},
+                {comparison: "SDOH + Accel", deltaAUC: 0.003716, ciLower: -0.062128, ciUpper: 0.070889},
+                
+                {comparison: "Demo + SDOH + Accel (vs SDOH)", deltaAUC: 0.050212, ciLower: -0.011928, ciUpper: 0.112974}
+            ],
+            splitB: [
+                {comparison: "PCE + Accel", deltaAUC: 0.001419, ciLower: -0.057434, ciUpper: 0.059310},
+                {comparison: "PCE + SDOH + Accel", deltaAUC: 0.014112, ciLower: -0.043735, ciUpper: 0.070602},
+                {comparison: "SCORE + Accel", deltaAUC: 0.002047, ciLower: -0.058222, ciUpper: 0.061861},
+                {comparison: "SCORE + SDOH + Accel", deltaAUC: 0.017666, ciLower: -0.041535, ciUpper: 0.076211},
+                {comparison: "LE8 + Accel", deltaAUC: 0.005245, ciLower: -0.063530, ciUpper: 0.075695},
+                {comparison: "LE8 + Demo + Accel", deltaAUC: 0.098142, ciLower: 0.035244, ciUpper: 0.162058},
+                {comparison: "LE8 + SDOH + Accel", deltaAUC: 0.067115, ciLower: 0.002017, ciUpper: 0.134704},
+                {comparison: "LE8 + SDOH + Demo + Accel", deltaAUC: 0.106722, ciLower: 0.044421, ciUpper: 0.170642},
+                {comparison: "Demo + Accel", deltaAUC: 0.002509, ciLower: -0.061100, ciUpper: 0.066730},
+                {comparison: "Demo + SDOH + Accel (vs Demo)", deltaAUC: 0.023730, ciLower: -0.038933, ciUpper: 0.086281},
+                {comparison: "SDOH + Accel", deltaAUC: 0.006009, ciLower: -0.063563, ciUpper: 0.078946},
+            
+                {comparison: "Demo + SDOH + Accel (vs SDOH)", deltaAUC: 0.051847, ciLower: -0.013705, ciUpper: 0.119001}
+            ],
+            splitC: [
+                {comparison: "PCE + Accel", deltaAUC: 0.003641, ciLower: -0.085615, ciUpper: 0.090510},
+                {comparison: "PCE + SDOH + Accel", deltaAUC: 0.024433, ciLower: -0.061202, ciUpper: 0.107646},
+                {comparison: "SCORE + Accel", deltaAUC: 0.005649, ciLower: -0.087920, ciUpper: 0.098266},
+                {comparison: "SCORE + SDOH + Accel", deltaAUC: 0.033907, ciLower: -0.053284, ciUpper: 0.122839},
+                {comparison: "LE8 + Accel", deltaAUC: 0.015244, ciLower: -0.098863, ciUpper: 0.125966},
+                {comparison: "LE8 + Demo + Accel", deltaAUC: 0.081671, ciLower: -0.015654, ciUpper: 0.183271},
+                {comparison: "LE8 + SDOH + Accel", deltaAUC: 0.084655, ciLower: -0.014732, ciUpper: 0.186488},
+                {comparison: "LE8 + SDOH + Demo + Accel", deltaAUC: 0.099908, ciLower: 0.006844, ciUpper: 0.199466},
+                {comparison: "Demo + Accel", deltaAUC: 0.009016, ciLower: -0.091042, ciUpper: 0.106646},
+                {comparison: "Demo + SDOH + Accel (vs Demo)", deltaAUC: 0.041200, ciLower: -0.054827, ciUpper: 0.134466},
+                {comparison: "SDOH + Accel", deltaAUC: 0.008794, ciLower: -0.090048, ciUpper: 0.106330},
+                {comparison: "Demo + SDOH + Accel (vs SDOH)", deltaAUC: 0.033781, ciLower: -0.060007, ciUpper: 0.130293}
+            ]
+        };
+
+        // Check statistical significance
+        function isSignificant(ciLower, ciUpper) {
+            return (ciLower > 0 && ciUpper > 0) || (ciLower < 0 && ciUpper < 0);
+        }
+
+        // Colors for each split
+        const colors = ['#e74c3c', '#3498db', '#2ecc71'];
+        const splitNames = ['Split A', 'Split B', 'Split C'];
+
+        // Feature labels (shortened)
+        const labels = [
+            'ΔAUC\n( (PCE + Accel) - PCE)',
+            'ΔAUC\n( (PCE + SDOH + Accel) - PCE)', 
+            'ΔAUC\n( (SCORE + Accel) - SCORE)',
+            'ΔAUC\n( (SCORE + SDOH + Accel) - SCORE)',
+            'ΔAUC\n( (LE8 + Accel) - LE8)',
+            'ΔAUC\n( (LE8 + Demo + Accel) - LE8)',
+            'ΔAUC\n( (LE8 + SDOH + Accel) - LE8)',
+            'ΔAUC\n( (LE8 + SDOH + Demo + Accel) - LE8)',
+            'ΔAUC\n( (Demo + Accel) - Demo)',
+            'ΔAUC\n( (Demo + SDOH + Accel) - Demo)',
+            'ΔAUC\n( (SDOH + Accel) - SDOH)',
+            'ΔAUC\n( (SDOH + Demo + Accel) - SDOH)'
+        ];
+
+        // Create main chart
+        const ctx1 = document.getElementById('errorBarChart').getContext('2d');
+        
+        const datasets = Object.keys(bootstrapData).map((split, index) => ({
+            label: splitNames[index],
+            data: bootstrapData[split].map(d => d.deltaAUC),
+            backgroundColor: colors[index] + '60',
+            borderColor: colors[index],
+            borderWidth: 2
+        }));
+
+        new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            afterBody: function(tooltipItems) {
+                                const item = tooltipItems[0];
+                                const splitIndex = item.datasetIndex;
+                                const dataIndex = item.dataIndex;
+                                const splitKey = Object.keys(bootstrapData)[splitIndex];
+                                const data = bootstrapData[splitKey][dataIndex];
+                                
+                                return [
+                                    '',
+                                    `ΔAUC: ${data.deltaAUC.toFixed(6)}`,
+                                    `95% CI: [${data.ciLower.toFixed(4)}, ${data.ciUpper.toFixed(4)}]`,
+                                    `Significant: ${isSignificant(data.ciLower, data.ciUpper) ? 'Yes' : 'No'}`
+                                ];
+                            }
+                        }
+                    }
+                },
+                                        scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Feature Combinations'
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            font: {
+                                size: 10
+                            }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'ΔAUC (Change in AUC)'
+                        },
+                        min: -0.15,
+                        max: 0.25,
+                        grid: {
+                            color: function(context) {
+                                // Make zero line more prominent
+                                if (context.tick.value === 0) {
+                                    return '#000000';
+                                }
+                                return '#e0e0e0';
+                            },
+                            lineWidth: function(context) {
+                                // Make zero line thicker
+                                if (context.tick.value === 0) {
+                                    return 2;
+                                }
+                                return 1;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+    </script>
+</body>
+</html>

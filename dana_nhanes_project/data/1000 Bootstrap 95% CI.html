@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Performance Analysis with CI</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/1.4.0/chartjs-plugin-annotation.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .title {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .viz-section {
+            margin-bottom: 50px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background: #fefefe;
+        }
+        .section-title {
+            color: #34495e;
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .chart-container {
+            position: relative;
+            height: 500px;
+            margin: 20px 0;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        select, button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .ci-info {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 15px 0;
+            font-size: 14px;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">Model Performance Analysis with Confidence Intervals</div>
+        
+        <!-- Performance Comparison Chart -->
+        <div class="viz-section">
+            <div class="section-title">Performance Comparison by Feature Set</div>
+            <div class="controls">
+                <select id="metricSelect">
+                    <option value="roc_auc">ROC-AUC</option>
+                    <option value="f1_score">F1-Score</option>
+                    <option value="sensitivity">Sensitivity</option>
+                    <option value="specificity">Specificity</option>
+                    <option value="balanced_accuracy">Balanced Accuracy</option>
+                </select>
+                <div class="checkbox-container">
+                    <input type="checkbox" id="showCICheckbox" checked>
+                    <label for="showCICheckbox">Show 95% CI</label>
+                </div>
+                <button onclick="updateChart()">Update Chart</button>
+            </div>
+            <div class="ci-info">
+                <strong>Confidence Intervals:</strong> Error bars show 95% confidence intervals. 
+                When intervals don't overlap, differences are likely statistically significant.
+            </div>
+            <div class="chart-container">
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Register annotation plugin
+        Chart.register(window['chartjs-plugin-annotation']);
+        
+        // Original data with added CI values (simulated for demonstration)
+        const data = {
+            'Split A': [
+{
+    feature: 'PCE',
+    roc_auc: 0.84616,
+    roc_auc_ci: [0.8164008303998324, 0.8747230246648546],
+    f1_score: 0.78058,
+    f1_score_ci: [0.7444015477904113, 0.8138636363636363],
+    sensitivity: 0.765992,
+    sensitivity_ci: [0.7205859517720131, 0.8103461457344722],
+    specificity: 0.80459,
+    specificity_ci: [0.7608051484238256, 0.8436973240623683],
+    balanced_accuracy: 0.785291,
+    balanced_accuracy_ci: [0.7540791267281796, 0.8134353507324209],
+},
+{
+    feature: 'PCE + Accel',
+    roc_auc: 0.849012,
+    roc_auc_ci: [0.8195272658496228, 0.8771105470720476],
+    f1_score: 0.77701,
+    f1_score_ci: [0.7408447137673856, 0.8101536537097196],
+    sensitivity: 0.760311,
+    sensitivity_ci: [0.7138362573099415, 0.8050923576575661],
+    specificity: 0.804507,
+    specificity_ci: [0.7627589755928035, 0.8454552080572488],
+    balanced_accuracy: 0.782409,
+    balanced_accuracy_ci: [0.7489168044269913, 0.8122132553135988],
+},
+{
+    feature: 'PCE + SDOH + Accel',
+    roc_auc: 0.852789,
+    roc_auc_ci: [0.8237327255009667, 0.8793596106749123],
+    f1_score: 0.769593,
+    f1_score_ci: [0.7341361671372715, 0.8039506367145489],
+    sensitivity: 0.762676,
+    sensitivity_ci: [0.7154182318959531, 0.8061566951566951],
+    specificity: 0.781994,
+    specificity_ci: [0.7388690619402786, 0.8244086779448621],
+    balanced_accuracy: 0.772335,
+    balanced_accuracy_ci: [0.7399899121417101, 0.8018927720629421],
+},
+{
+    feature: 'SCORE',
+    roc_auc: 0.838905,
+    roc_auc_ci: [0.8089054616215517, 0.8661624864245461],
+    f1_score: 0.76677,
+    f1_score_ci: [0.7303482616962613, 0.8011210492780804],
+    sensitivity: 0.757146,
+    sensitivity_ci: [0.7129093231381155, 0.8025576058448858],
+    specificity: 0.783537,
+    specificity_ci: [0.7414706923467905, 0.8230094710152133],
+    balanced_accuracy: 0.770342,
+    balanced_accuracy_ci: [0.7383096883072993, 0.799651781835803],
+},
+{
+    feature: 'SCORE + Accel',
+    roc_auc: 0.842457,
+    roc_auc_ci: [0.8129049665271636, 0.8699477423474835],
+    f1_score: 0.766181,
+    f1_score_ci: [0.7286682412790697, 0.7994392791640338],
+    sensitivity: 0.754234,
+    sensitivity_ci: [0.7088206588941883, 0.7994018410171062],
+    specificity: 0.786696,
+    specificity_ci: [0.7420289855072464, 0.82840428180234],
+    balanced_accuracy: 0.770465,
+    balanced_accuracy_ci: [0.7387315544349897, 0.7997108697766593],
+},
+{
+    feature: 'SCORE + SDOH + Accel',
+    roc_auc: 0.848623,
+    roc_auc_ci: [0.819016663362638, 0.8757465484838446],
+    f1_score: 0.769391,
+    f1_score_ci: [0.7315579183727381, 0.8022456583466401],
+    sensitivity: 0.762705,
+    sensitivity_ci: [0.7142857142857143, 0.8081425361871442],
+    specificity: 0.781456,
+    specificity_ci: [0.7366824044219253, 0.8247232428867532],
+    balanced_accuracy: 0.77208,
+    balanced_accuracy_ci: [0.7371071353350027, 0.8016976995485544],
+},
+{
+    feature: 'LE8',
+    roc_auc: 0.752939,
+    roc_auc_ci: [0.7177390644046111, 0.7869001132360878],
+    f1_score: 0.685366,
+    f1_score_ci: [0.6433111707080865, 0.723342939481268],
+    sensitivity: 0.686946,
+    sensitivity_ci: [0.6377171096403683, 0.7359132154990754],
+    specificity: 0.684125,
+    specificity_ci: [0.6358377189198516, 0.7345771976796074],
+    balanced_accuracy: 0.685535,
+    balanced_accuracy_ci: [0.6506225044129407, 0.7198808598058551],
+},
+{
+    feature: 'LE8 + Accel',
+    roc_auc: 0.759098,
+    roc_auc_ci: [0.7249213670001359, 0.793029650870598],
+    f1_score: 0.675719,
+    f1_score_ci: [0.6358279944820115, 0.7148803413831346],
+    sensitivity: 0.681181,
+    sensitivity_ci: [0.6333284023668638, 0.7311008403361344],
+    specificity: 0.666909,
+    specificity_ci: [0.6153560830860535, 0.7168603791258905],
+    balanced_accuracy: 0.674045,
+    balanced_accuracy_ci: [0.6392252139440971, 0.7089795917873103],
+},
+{
+    feature: 'LE8 + Demo + Accel',
+    roc_auc: 0.844607,
+    roc_auc_ci: [0.8152549365154512, 0.8709612447888924],
+    f1_score: 0.767184,
+    f1_score_ci: [0.7294460564494857, 0.8005914002267117],
+    sensitivity: 0.762653,
+    sensitivity_ci: [0.7114240121580547, 0.8078107833443199],
+    specificity: 0.775792,
+    specificity_ci: [0.7305363186670137, 0.8208221585514152],
+    balanced_accuracy: 0.769223,
+    balanced_accuracy_ci: [0.736866867896837, 0.7994798234161857],
+},
+{
+    feature: 'LE8 + SDOH + Accel',
+    roc_auc: 0.810176,
+    roc_auc_ci: [0.7787808751029286, 0.8427530151000906],
+    f1_score: 0.755396,
+    f1_score_ci: [0.7204876167037775, 0.7900630742021817],
+    sensitivity: 0.769272,
+    sensitivity_ci: [0.7244318181818182, 0.8134160384356617],
+    specificity: 0.73402,
+    specificity_ci: [0.6869521489255372, 0.7819861491108071],
+    balanced_accuracy: 0.751646,
+    balanced_accuracy_ci: [0.7199800797375647, 0.7833589049010103],
+},
+{
+    feature: 'LE8 + SDOH + Demo + Accel',
+    roc_auc: 0.839869,
+    roc_auc_ci: [0.8104949241903444, 0.8674381679502223],
+    f1_score: 0.756139,
+    f1_score_ci: [0.7217927361976236, 0.7901609569672472],
+    sensitivity: 0.762912,
+    sensitivity_ci: [0.7168141592920354, 0.8080258379422937],
+    specificity: 0.746498,
+    specificity_ci: [0.7026239067055393, 0.7922876863275895],
+    balanced_accuracy: 0.754705,
+    balanced_accuracy_ci: [0.7250113839483396, 0.786252009440093],
+},
+{
+    feature: 'Demo',
+    roc_auc: 0.832364,
+    roc_auc_ci: [0.8015288465769684, 0.8613055764157421],
+    f1_score: 0.763413,
+    f1_score_ci: [0.7280516038297182, 0.7967032967032966],
+    sensitivity: 0.784231,
+    sensitivity_ci: [0.7383156954370533, 0.8254505494505494],
+    specificity: 0.731138,
+    specificity_ci: [0.6805849713966192, 0.7765425478850758],
+    balanced_accuracy: 0.757685,
+    balanced_accuracy_ci: [0.7240772168715676, 0.7867727410390996],
+},
+{
+    feature: 'Demo + Accel',
+    roc_auc: 0.837395,
+    roc_auc_ci: [0.8080531366993284, 0.8655741821936341],
+    f1_score: 0.761377,
+    f1_score_ci: [0.7234677580980535, 0.7946895027624309],
+    sensitivity: 0.77542,
+    sensitivity_ci: [0.7317696793002916, 0.8166320098239869],
+    specificity: 0.739963,
+    specificity_ci: [0.68836782958596, 0.7824889462048636],
+    balanced_accuracy: 0.757692,
+    balanced_accuracy_ci: [0.7243680501321511, 0.7895370124861241],
+},
+{
+    feature: 'SDOH',
+    roc_auc: 0.794497,
+    roc_auc_ci: [0.7598694881746749, 0.8260599660310204],
+    f1_score: 0.738429,
+    f1_score_ci: [0.7008527131782946, 0.7745474137931034],
+    sensitivity: 0.74882,
+    sensitivity_ci: [0.7056884317946265, 0.7941327410729687],
+    specificity: 0.722254,
+    specificity_ci: [0.672514619883041, 0.7688216982057064],
+    balanced_accuracy: 0.735537,
+    balanced_accuracy_ci: [0.7029830043959471, 0.7678843131354955],
+},
+{
+    feature: 'SDOH + Accel',
+    roc_auc: 0.798212,
+    roc_auc_ci: [0.7639318200326258, 0.8307582375689585],
+    f1_score: 0.730367,
+    f1_score_ci: [0.6925344303741323, 0.7656583970035664],
+    sensitivity: 0.734268,
+    sensitivity_ci: [0.6900562576654402, 0.7810673369184007],
+    specificity: 0.72518,
+    specificity_ci: [0.6784634891062464, 0.7724915077083878],
+    balanced_accuracy: 0.729724,
+    balanced_accuracy_ci: [0.6973494638125939, 0.7632387988800724],
+},
+{
+    feature: 'Demo + SDOH + Accel',
+    roc_auc: 0.844708,
+    roc_auc_ci: [0.8141323584418904, 0.8728432142175826],
+    f1_score: 0.78041,
+    f1_score_ci: [0.7467792307353949, 0.8126843414422102],
+    sensitivity: 0.795737,
+    sensitivity_ci: [0.753706010390008, 0.8367346938775511],
+    specificity: 0.757813,
+    specificity_ci: [0.7130083996463307, 0.8024855324074074],
+    balanced_accuracy: 0.776775,
+    balanced_accuracy_ci: [0.746459582775496, 0.8071972095306942],
+}
+            ],
+            'Split B': [
+{
+    feature: 'PCE',
+    roc_auc: 0.820444,
+    roc_auc_ci: [0.7899498660072023, 0.848436276056448],
+    f1_score: 0.742669,
+    f1_score_ci: [0.7083140156918688, 0.7741955823129805],
+    sensitivity: 0.784323,
+    sensitivity_ci: [0.7413633461047254, 0.8225352112676056],
+    specificity: 0.672922,
+    specificity_ci: [0.6260863406823501, 0.7199141393158841],
+    balanced_accuracy: 0.728622,
+    balanced_accuracy_ci: [0.6968838526912181, 0.758640461405431],
+},
+{
+    feature: 'PCE + Accel',
+    roc_auc: 0.821863,
+    roc_auc_ci: [0.7910021784393685, 0.8492603436072774],
+    f1_score: 0.747943,
+    f1_score_ci: [0.7120531030824542, 0.7788346413205784],
+    sensitivity: 0.793056,
+    sensitivity_ci: [0.7492947235652723, 0.8309977844595664],
+    specificity: 0.673166,
+    specificity_ci: [0.6257387961828504, 0.7204790583399648],
+    balanced_accuracy: 0.733111,
+    balanced_accuracy_ci: [0.7006447655235836, 0.7618933181899067],
+},
+{
+    feature: 'PCE + SDOH + Accel',
+    roc_auc: 0.834556,
+    roc_auc_ci: [0.8047016560925887, 0.8605522201310245],
+    f1_score: 0.759111,
+    f1_score_ci: [0.7259799125860799, 0.7905341859742708],
+    sensitivity: 0.776085,
+    sensitivity_ci: [0.7340993983030795, 0.816671511627907],
+    specificity: 0.732094,
+    specificity_ci: [0.6864378379606488, 0.7763213025580711],
+    balanced_accuracy: 0.754089,
+    balanced_accuracy_ci: [0.7242137978984993, 0.7822009400386546],
+},
+{
+    feature: 'SCORE',
+    roc_auc: 0.811311,
+    roc_auc_ci: [0.7798993668990675, 0.8401265500988698],
+    f1_score: 0.736803,
+    f1_score_ci: [0.7, 0.7698502886002886],
+    sensitivity: 0.772839,
+    sensitivity_ci: [0.7312913452559384, 0.8149277216223003],
+    specificity: 0.675795,
+    specificity_ci: [0.6280975028402129, 0.7226666666666667],
+    balanced_accuracy: 0.724317,
+    balanced_accuracy_ci: [0.6926243086839555, 0.7550828940094179],
+},
+{
+    feature: 'SCORE + Accel',
+    roc_auc: 0.813357,
+    roc_auc_ci: [0.781904495185732, 0.841760753647338],
+    f1_score: 0.73219,
+    f1_score_ci: [0.6966164282598559, 0.7654150712272676],
+    sensitivity: 0.769916,
+    sensitivity_ci: [0.7283492537313433, 0.8102057334467578],
+    specificity: 0.667633,
+    specificity_ci: [0.6174058890657595, 0.7142952380952381],
+    balanced_accuracy: 0.718774,
+    balanced_accuracy_ci: [0.686102294522952, 0.7496489136515015],
+},
+{
+    feature: 'SCORE + SDOH + Accel',
+    roc_auc: 0.828977,
+    roc_auc_ci: [0.7985913898521265, 0.8561101735593762],
+    f1_score: 0.759071,
+    f1_score_ci: [0.7236313573048268, 0.7915020656161633],
+    sensitivity: 0.784514,
+    sensitivity_ci: [0.7410443380372477, 0.8232014008193471],
+    specificity: 0.718214,
+    specificity_ci: [0.6715923948572674, 0.7635945048309178],
+    balanced_accuracy: 0.751364,
+    balanced_accuracy_ci: [0.719388077522354, 0.7809744398798273],
+},
+{
+    feature: 'LE8',
+    roc_auc: 0.724309,
+    roc_auc_ci: [0.6874730412169764, 0.7567470051641741],
+    f1_score: 0.659241,
+    f1_score_ci: [0.6195398015387306, 0.6984171696847753],
+    sensitivity: 0.648272,
+    sensitivity_ci: [0.5988222907999726, 0.6959182426819137],
+    specificity: 0.682649,
+    specificity_ci: [0.6345029239766082, 0.7302166222722651],
+    balanced_accuracy: 0.665461,
+    balanced_accuracy_ci: [0.6314505187085873, 0.6975512629878038],
+},
+{
+    feature: 'LE8 + Accel',
+    roc_auc: 0.729554,
+    roc_auc_ci: [0.693216928115291, 0.7631681426080134],
+    f1_score: 0.674806,
+    f1_score_ci: [0.6370270270270271, 0.7134835329804686],
+    sensitivity: 0.665622,
+    sensitivity_ci: [0.617796221570066, 0.713146148829795],
+    specificity: 0.69378,
+    specificity_ci: [0.646562644297368, 0.7380401084668933],
+    balanced_accuracy: 0.679701,
+    balanced_accuracy_ci: [0.646200658098861, 0.7125274606858802],
+},
+{
+    feature: 'LE8 + Demo + Accel',
+    roc_auc: 0.822452,
+    roc_auc_ci: [0.7919908979991978, 0.8495313365263162],
+    f1_score: 0.746295,
+    f1_score_ci: [0.7093790227767334, 0.7785271212953959],
+    sensitivity: 0.786839,
+    sensitivity_ci: [0.7443736623863029, 0.8296792796438689],
+    specificity: 0.678924,
+    specificity_ci: [0.629935655994978, 0.72625845339606],
+    balanced_accuracy: 0.732882,
+    balanced_accuracy_ci: [0.6987514070444242, 0.7632508582651671],
+},
+{
+    feature: 'LE8 + SDOH + Accel',
+    roc_auc: 0.791425,
+    roc_auc_ci: [0.7587635830147029, 0.8221765599086012],
+    f1_score: 0.705022,
+    f1_score_ci: [0.6647479935127043, 0.7431054483983898],
+    sensitivity: 0.705353,
+    sensitivity_ci: [0.6555315691736304, 0.7486350933427831],
+    specificity: 0.705262,
+    specificity_ci: [0.6567154011956566, 0.754395525598738],
+    balanced_accuracy: 0.705307,
+    balanced_accuracy_ci: [0.6699453798940477, 0.7380616603920856],
+},
+{
+    feature: 'LE8 + SDOH + Demo + Accel',
+    roc_auc: 0.831032,
+    roc_auc_ci: [0.8011676569287566, 0.8581146769006076],
+    f1_score: 0.753928,
+    f1_score_ci: [0.7171414565826331, 0.7871507305819021],
+    sensitivity: 0.776052,
+    sensitivity_ci: [0.7339035087719298, 0.8181881665820214],
+    specificity: 0.718096,
+    specificity_ci: [0.6685232921405377, 0.7667562275772047],
+    balanced_accuracy: 0.747074,
+    balanced_accuracy_ci: [0.715339142993465, 0.7767474124200738],
+},
+{
+    feature: 'Demo',
+    roc_auc: 0.793318,
+    roc_auc_ci: [0.7599710062622879, 0.824323493999607],
+    f1_score: 0.746608,
+    f1_score_ci: [0.7125171939477304, 0.779488188976378],
+    sensitivity: 0.796139,
+    sensitivity_ci: [0.7554310882700644, 0.837081917951398],
+    specificity: 0.66421,
+    specificity_ci: [0.6169542493959449, 0.7126208083641464],
+    balanced_accuracy: 0.730174,
+    balanced_accuracy_ci: [0.6996895826784584, 0.7616818723884349],
+},
+{
+    feature: 'Demo + Accel',
+    roc_auc: 0.795827,
+    roc_auc_ci: [0.763223629953792, 0.826701488116361],
+    f1_score: 0.741958,
+    f1_score_ci: [0.7077981879729192, 0.7769028871391076],
+    sensitivity: 0.784639,
+    sensitivity_ci: [0.7435108415910248, 0.8268671067738231],
+    specificity: 0.670346,
+    specificity_ci: [0.623174733388023, 0.7186788349704345],
+    balanced_accuracy: 0.727492,
+    balanced_accuracy_ci: [0.695766666950117, 0.7585077726404534],
+},
+{
+    feature: 'SDOH',
+    roc_auc: 0.765201,
+    roc_auc_ci: [0.7272513758394531, 0.7990947922070941],
+    f1_score: 0.709033,
+    f1_score_ci: [0.669589382940109, 0.7473144089198075],
+    sensitivity: 0.711211,
+    sensitivity_ci: [0.662665645759641, 0.758931506849315],
+    specificity: 0.705984,
+    specificity_ci: [0.6573013814177039, 0.7550135501355013],
+    balanced_accuracy: 0.708597,
+    balanced_accuracy_ci: [0.6727241605024536, 0.742328742040913],
+},
+{
+    feature: 'SDOH + Accel',
+    roc_auc: 0.77121,
+    roc_auc_ci: [0.7355318057849982, 0.806197301209294],
+    f1_score: 0.719514,
+    f1_score_ci: [0.6794103651709587, 0.7570656343726023],
+    sensitivity: 0.719774,
+    sensitivity_ci: [0.6745881171067738, 0.7666761363636364],
+    specificity: 0.719898,
+    specificity_ci: [0.6742162678227662, 0.7679106017191977],
+    balanced_accuracy: 0.719836,
+    balanced_accuracy_ci: [0.6854791405880175, 0.7532305301875962],
+},
+{
+    feature: 'Demo + SDOH + Accel',
+    roc_auc: 0.817048,
+    roc_auc_ci: [0.7853902612924543, 0.8462520031539396],
+    f1_score: 0.757877,
+    f1_score_ci: [0.7217354249011858, 0.7931669547601484],
+    sensitivity: 0.779176,
+    sensitivity_ci: [0.7392544308111793, 0.8237035273252759],
+    specificity: 0.723737,
+    specificity_ci: [0.6762157300078145, 0.7715915284001453],
+    balanced_accuracy: 0.751457,
+    balanced_accuracy_ci: [0.718936497904404, 0.7826732488273109],
+}
+            ],
+            'Split C': [
+{
+    feature: 'PCE',
+    roc_auc: 0.837385,
+    roc_auc_ci: [0.7941478253298648, 0.8822868623496549],
+    f1_score: 0.790288,
+    f1_score_ci: [0.7412984412984412, 0.8350369365294738],
+    sensitivity: 0.841648,
+    sensitivity_ci: [0.7808135649849649, 0.8963026819923371],
+    specificity: 0.712497,
+    specificity_ci: [0.6363460183227625, 0.7862208417849899],
+    balanced_accuracy: 0.777072,
+    balanced_accuracy_ci: [0.7308088005673966, 0.82441497153384],
+},
+{
+    feature: 'PCE + Accel',
+    roc_auc: 0.841025,
+    roc_auc_ci: [0.796672345055702, 0.8846582476322549],
+    f1_score: 0.768184,
+    f1_score_ci: [0.7137904783125371, 0.8159603105045699],
+    sensitivity: 0.812887,
+    sensitivity_ci: [0.7452130463430705, 0.8730214621059692],
+    specificity: 0.697506,
+    specificity_ci: [0.6223538961038961, 0.7720755347593583],
+    balanced_accuracy: 0.755197,
+    balanced_accuracy_ci: [0.7067084466048744, 0.8026032988203101],
+},
+{
+    feature: 'PCE + SDOH + Accel',
+    roc_auc: 0.861818,
+    roc_auc_ci: [0.8210843910365787, 0.901794012605042],
+    f1_score: 0.782835,
+    f1_score_ci: [0.7325743048897411, 0.8356480132128631],
+    sensitivity: 0.791772,
+    sensitivity_ci: [0.7272727272727273, 0.8533503649635037],
+    specificity: 0.769856,
+    specificity_ci: [0.6933333333333334, 0.840305316091954],
+    balanced_accuracy: 0.780814,
+    balanced_accuracy_ci: [0.7338087232077691, 0.8306832201674772],
+},
+{
+    feature: 'SCORE',
+    roc_auc: 0.819043,
+    roc_auc_ci: [0.7719825352404643, 0.865965762419542],
+    f1_score: 0.770903,
+    f1_score_ci: [0.7172314917809912, 0.8191186832544314],
+    sensitivity: 0.812702,
+    sensitivity_ci: [0.7463741077222582, 0.8758633274603573],
+    specificity: 0.705313,
+    specificity_ci: [0.6267419557998397, 0.7769796325102081],
+    balanced_accuracy: 0.759008,
+    balanced_accuracy_ci: [0.7110189352900056, 0.8053030799955113],
+},
+{
+    feature: 'SCORE + Accel',
+    roc_auc: 0.824692,
+    roc_auc_ci: [0.7780460634303507, 0.8702480622343954],
+    f1_score: 0.768281,
+    f1_score_ci: [0.7152204091850436, 0.8164556962025317],
+    sensitivity: 0.812702,
+    sensitivity_ci: [0.7463741077222582, 0.8758633274603573],
+    specificity: 0.698134,
+    specificity_ci: [0.6232649200114954, 0.769825282631038],
+    balanced_accuracy: 0.755418,
+    balanced_accuracy_ci: [0.7060512353912115, 0.8016364322559133],
+},
+{
+    feature: 'SCORE + SDOH + Accel',
+    roc_auc: 0.85295,
+    roc_auc_ci: [0.812681435190277, 0.894821663179096],
+    f1_score: 0.768384,
+    f1_score_ci: [0.7153152915755356, 0.8215602628223988],
+    sensitivity: 0.790769,
+    sensitivity_ci: [0.7233934732604946, 0.8540145985401459],
+    specificity: 0.733446,
+    specificity_ci: [0.6553935097068899, 0.8029516104333623],
+    balanced_accuracy: 0.762107,
+    balanced_accuracy_ci: [0.7154389205773053, 0.8119945143209661],
+},
+{
+    feature: 'LE8',
+    roc_auc: 0.75995,
+    roc_auc_ci: [0.7011445049104065, 0.8138059701492537],
+    f1_score: 0.704458,
+    f1_score_ci: [0.6425926901894649, 0.7629767267267267],
+    sensitivity: 0.70521,
+    sensitivity_ci: [0.6285666023166023, 0.7746525510679974],
+    specificity: 0.704421,
+    specificity_ci: [0.6285714285714286, 0.7761379055137535],
+    balanced_accuracy: 0.704815,
+    balanced_accuracy_ci: [0.6505374408862142, 0.7537847671262818],
+},
+{
+    feature: 'LE8 + Accel',
+    roc_auc: 0.775194,
+    roc_auc_ci: [0.7149430862393247, 0.8271101151001798],
+    f1_score: 0.697933,
+    f1_score_ci: [0.6331833409039291, 0.7573733660130718],
+    sensitivity: 0.691447,
+    sensitivity_ci: [0.6119284152485978, 0.7647488192357234],
+    specificity: 0.711556,
+    specificity_ci: [0.6369707347447073, 0.7829525126036754],
+    balanced_accuracy: 0.701501,
+    balanced_accuracy_ci: [0.6462056904581791, 0.7540143019964561],
+},
+{
+    feature: 'LE8 + Demo + Accel',
+    roc_auc: 0.841621,
+    roc_auc_ci: [0.7981519962381604, 0.8844152818760678],
+    f1_score: 0.784821,
+    f1_score_ci: [0.7357841614906832, 0.8322300646661634],
+    sensitivity: 0.841724,
+    sensitivity_ci: [0.7806325783573553, 0.9007105733311678],
+    specificity: 0.697637,
+    specificity_ci: [0.6186887989608314, 0.7681294613887086],
+    balanced_accuracy: 0.76968,
+    balanced_accuracy_ci: [0.724147599580079, 0.8151316079244766],
+},
+{
+    feature: 'LE8 + SDOH + Accel',
+    roc_auc: 0.844605,
+    roc_auc_ci: [0.7990736925439205, 0.887632762419521],
+    f1_score: 0.756705,
+    f1_score_ci: [0.7024644847343222, 0.8093726493154807],
+    sensitivity: 0.784238,
+    sensitivity_ci: [0.7152529761904762, 0.8456504904491482],
+    specificity: 0.712398,
+    specificity_ci: [0.6402641820969455, 0.7910528293782884],
+    balanced_accuracy: 0.748318,
+    balanced_accuracy_ci: [0.7005617951365419, 0.7995993951441264],
+},
+{
+    feature: 'LE8 + SDOH + Demo + Accel',
+    roc_auc: 0.859858,
+    roc_auc_ci: [0.8206499336986574, 0.9006106792784823],
+    f1_score: 0.795354,
+    f1_score_ci: [0.75, 0.8445945945945946],
+    sensitivity: 0.813011,
+    sensitivity_ci: [0.75, 0.8725021268550902],
+    specificity: 0.769438,
+    specificity_ci: [0.6950354609929078, 0.8367422524565382],
+    balanced_accuracy: 0.791224,
+    balanced_accuracy_ci: [0.7484915266544528, 0.8383113183113183],
+},
+{
+    feature: 'Demo',
+    roc_auc: 0.804145,
+    roc_auc_ci: [0.756293856375526, 0.8560379102447668],
+    f1_score: 0.779093,
+    f1_score_ci: [0.7291505584192439, 0.8273671796023813],
+    sensitivity: 0.84063,
+    sensitivity_ci: [0.7812442974452555, 0.8943661971830986],
+    specificity: 0.683533,
+    specificity_ci: [0.605829485078703, 0.7575816761363636],
+    balanced_accuracy: 0.762081,
+    balanced_accuracy_ci: [0.7169413751157173, 0.8083386057786451],
+},
+{
+    feature: 'Demo + Accel',
+    roc_auc: 0.813161,
+    roc_auc_ci: [0.7649963197789285, 0.8629402635977845],
+    f1_score: 0.787392,
+    f1_score_ci: [0.7372083188506546, 0.8376647320231391],
+    sensitivity: 0.855706,
+    sensitivity_ci: [0.7960492749731471, 0.907803751399776],
+    specificity: 0.682946,
+    specificity_ci: [0.6029082974653276, 0.7571428571428571],
+    balanced_accuracy: 0.769326,
+    balanced_accuracy_ci: [0.7249118351208439, 0.8146466298756375],
+},
+{
+    feature: 'SDOH',
+    roc_auc: 0.811564,
+    roc_auc_ci: [0.7604664260266353, 0.8612177844085739],
+    f1_score: 0.744584,
+    f1_score_ci: [0.6865671641791045, 0.7987128712871286],
+    sensitivity: 0.755812,
+    sensitivity_ci: [0.6805484693877552, 0.820901589612911],
+    specificity: 0.726815,
+    specificity_ci: [0.650340909090909, 0.7986458333333334],
+    balanced_accuracy: 0.741314,
+    balanced_accuracy_ci: [0.6885721293453102, 0.7942769344565053],
+},
+{
+    feature: 'SDOH + Accel',
+    roc_auc: 0.820359,
+    roc_auc_ci: [0.771169888220839, 0.8667964743948587],
+    f1_score: 0.74772,
+    f1_score_ci: [0.6917795344525698, 0.8027681660899654],
+    sensitivity: 0.748309,
+    sensitivity_ci: [0.6731664421493789, 0.813953488372093],
+    specificity: 0.747919,
+    specificity_ci: [0.6737588652482269, 0.8162085667600373],
+    balanced_accuracy: 0.748114,
+    balanced_accuracy_ci: [0.6970268510698198, 0.7988247258546589],
+},
+{
+    feature: 'Demo + SDOH + Accel',
+    roc_auc: 0.845345,
+    roc_auc_ci: [0.8012109696741433, 0.8907593582887701],
+    f1_score: 0.791197,
+    f1_score_ci: [0.7394208534790835, 0.8401253918495298],
+    sensitivity: 0.834169,
+    sensitivity_ci: [0.7720281862745099, 0.8897985966039959],
+    specificity: 0.726286,
+    specificity_ci: [0.6503963414634146, 0.8000354609929078],
+    balanced_accuracy: 0.780228,
+    balanced_accuracy_ci: [0.732714707252679, 0.8299190146608173],
+}
+            ]
+        };
+
+      
+
+
+        const featureNames = data['Split A'].map(d => d.feature);
+        const metrics = ['roc_auc', 'f1_score', 'sensitivity', 'specificity', 'balanced_accuracy'];
+        const metricLabels = {
+            'roc_auc': 'ROC-AUC',
+            'f1_score': 'F1-Score',
+            'sensitivity': 'Sensitivity',
+            'specificity': 'Specificity',
+            'balanced_accuracy': 'Balanced Accuracy'
+        };
+
+        let performanceChart;
+
+        // Find divider positions
+        function getDividerPositions() {
+            const dividers = [];
+            
+            // Find position between 'PCE + SDOH + Accel' and 'SCORE'
+            const firstDividerIndex = featureNames.findIndex(f => f === 'PCE + SDOH + Accel');
+            if (firstDividerIndex !== -1) {
+                dividers.push(firstDividerIndex + 0.5);
+            }
+            
+            // Find position between 'SCORE + SDOH + Accel' and 'LE8'
+            const secondDividerIndex = featureNames.findIndex(f => f === 'SCORE + SDOH + Accel');
+            if (secondDividerIndex !== -1) {
+                dividers.push(secondDividerIndex + 0.5);
+            }
+            
+            // Find position between 'LE8 + SDOH + Demo + Accel' and 'Demo'
+            const thirdDividerIndex = featureNames.findIndex(f => f === 'LE8 + SDOH + Demo + Accel');
+            if (thirdDividerIndex !== -1) {
+                dividers.push(thirdDividerIndex + 0.5);
+            }
+            
+            // Find position between 'Demo + Accel' and 'SDOH'
+            const fourthDividerIndex = featureNames.findIndex(f => f === 'Demo + Accel');
+            if (fourthDividerIndex !== -1) {
+                dividers.push(fourthDividerIndex + 0.5);
+            }
+            
+            return dividers;
+        }
+
+        // Custom plugin for error bars
+        const errorBarPlugin = {
+            id: 'errorBars',
+            afterDatasetsDraw: function(chart) {
+                if (!document.getElementById('showCICheckbox').checked) return;
+                
+                const ctx = chart.ctx;
+                const metric = document.getElementById('metricSelect').value;
+                
+                chart.data.datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    const splitName = dataset.label;
+                    
+                    meta.data.forEach((bar, index) => {
+                        const item = data[splitName][index];
+                        if (!item || !item[metric + '_ci']) return;
+                        
+                        const [lower, upper] = item[metric + '_ci'];
+                        const value = item[metric];
+                        
+                        const x = bar.x;
+                        const yScale = chart.scales.y;
+                        const yValue = yScale.getPixelForValue(value);
+                        const yLower = yScale.getPixelForValue(lower);
+                        const yUpper = yScale.getPixelForValue(upper);
+                        
+                        ctx.save();
+                        ctx.strokeStyle = dataset.borderColor;
+                        ctx.lineWidth = 2;
+                        
+                        // Draw vertical line
+                        ctx.beginPath();
+                        ctx.moveTo(x, yLower);
+                        ctx.lineTo(x, yUpper);
+                        ctx.stroke();
+                        
+                        // Draw caps
+                        const capWidth = 4;
+                        ctx.beginPath();
+                        ctx.moveTo(x - capWidth, yLower);
+                        ctx.lineTo(x + capWidth, yLower);
+                        ctx.moveTo(x - capWidth, yUpper);
+                        ctx.lineTo(x + capWidth, yUpper);
+                        ctx.stroke();
+                        
+                        ctx.restore();
+                    });
+                });
+            }
+        };
+
+        // Register the error bar plugin
+        Chart.register(errorBarPlugin);
+
+        function initPerformanceChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            const metric = document.getElementById('metricSelect').value;
+            const dividerPositions = getDividerPositions();
+            
+            // Create annotation objects for divider lines
+            const annotations = {};
+            dividerPositions.forEach((pos, index) => {
+                annotations[`line${index}`] = {
+                    type: 'line',
+                    xMin: pos,
+                    xMax: pos,
+                    borderColor: 'rgba(64, 64, 64, 0.8)',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    label: {
+                        display: false
+                    }
+                };
+            });
+            
+            performanceChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: featureNames,
+                    datasets: [
+                        {
+                            label: 'Split A',
+                            data: data['Split A'].map(d => d[metric]),
+                            backgroundColor: 'rgba(231, 76, 60, 0.7)',
+                            borderColor: 'rgba(231, 76, 60, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Split B',
+                            data: data['Split B'].map(d => d[metric]),
+                            backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Split C',
+                            data: data['Split C'].map(d => d[metric]),
+                            backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                            borderColor: 'rgba(46, 204, 113, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${metricLabels[metric]} by Feature Set (with 95% CI)`,
+                            font: { size: 16 }
+                        },
+                        legend: {
+                            position: 'top'
+                        },
+                        annotation: {
+                            annotations: annotations
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            max: 1
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart() {
+            const metric = document.getElementById('metricSelect').value;
+            const showCI = document.getElementById('showCICheckbox').checked;
+            
+            performanceChart.data.datasets[0].data = data['Split A'].map(d => d[metric]);
+            performanceChart.data.datasets[1].data = data['Split B'].map(d => d[metric]);
+            performanceChart.data.datasets[2].data = data['Split C'].map(d => d[metric]);
+            
+            const titleSuffix = showCI ? ' (with 95% CI)' : '';
+            performanceChart.options.plugins.title.text = `${metricLabels[metric]} by Feature Set${titleSuffix}`;
+            
+            performanceChart.update();
+        }
+
+        // Initialize everything when page loads
+        window.onload = function() {
+            initPerformanceChart();
+        };
+    </script>
+</body>
+</html>
