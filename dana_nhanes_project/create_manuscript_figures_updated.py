@@ -32,6 +32,31 @@ def parse_ci_string(ci_string):
     else:
         return np.nan, np.nan, np.nan
 
+def transform_model_name(model_name):
+    """Transform model names from old naming convention to new naming convention"""
+    if pd.isna(model_name) or model_name == '':
+        return model_name
+    
+    # Apply transformations in order
+    transformed_name = model_name
+    
+    # Replace model combination names
+    transformed_name = transformed_name.replace('Accel Various', 'Acc-Driven MVPA')
+    transformed_name = transformed_name.replace('Accel', 'Total MIMS')
+    transformed_name = transformed_name.replace('Demographics', 'DEMO')
+    
+    # Replace underscores with spaces for clinic-free models
+    transformed_name = transformed_name.replace('PCE_Clinic_Free', 'PCE Clinic-Free')
+    transformed_name = transformed_name.replace('SCORE_Clinic_Free', 'SCORE Clinic-Free')
+    transformed_name = transformed_name.replace('LE8_Clinic_Free', 'LE8 Clinic-Free')
+    
+    # Replace underscores with spaces for reasonable clinic-free models
+    transformed_name = transformed_name.replace('PCE_Reasonable_Clinic_Free', 'PCE Reasonable Clinic-Free')
+    transformed_name = transformed_name.replace('SCORE_Reasonable_Clinic_Free', 'SCORE Reasonable Clinic-Free')
+    transformed_name = transformed_name.replace('LE8_Reasonable_Clinic_Free', 'LE8 Reasonable Clinic-Free')
+    
+    return transformed_name
+
 def load_real_data():
     """Load and process the actual data files"""
     # Load bootstrap results for all splits
@@ -45,6 +70,9 @@ def load_real_data():
         for _, row in bootstrap_df.iterrows():
             model_name = row.iloc[0]
             auc_str = row['ROC AUC']
+            
+            # Transform model names to match new naming convention
+            model_name = transform_model_name(model_name)
             
             # Parse values and CIs
             auc_val, auc_lower, auc_upper = parse_ci_string(auc_str)
@@ -63,9 +91,9 @@ def create_figure_traditional_risk_models(df):
     """Figure for Impact of Physical Activity Measures on Clinical Risk Models"""
     
     # Filter for traditional risk models
-    traditional_models = ['PCE', 'PCE + Self Reported Physical Activity', 'PCE + Accel', 'PCE + Accel Various',
-                         'SCORE', 'SCORE + Self Reported Physical Activity', 'SCORE + Accel', 'SCORE + Accel Various',
-                         'LE8', 'LE8 + Self Reported Physical Activity', 'LE8 + Accel', 'LE8 + Accel Various']
+    traditional_models = ['PCE', 'PCE + Self Reported Physical Activity', 'PCE + Total MIMS', 'PCE + Acc-Driven MVPA',
+                         'SCORE', 'SCORE + Self Reported Physical Activity', 'SCORE + Total MIMS', 'SCORE + Acc-Driven MVPA',
+                         'LE8', 'LE8 + Self Reported Physical Activity', 'LE8 + Total MIMS', 'LE8 + Acc-Driven MVPA']
     
     # Filter data for these models
     filtered_data = df[df['Model'].isin(traditional_models)].copy()
@@ -128,7 +156,7 @@ def create_figure_traditional_risk_models(df):
     
     ax.set_xlabel('Model')
     ax.set_ylabel('ROC AUC with 95% CI')
-    ax.set_title('Impact of Physical Activity Measures on Clinical Risk Models', 
+    ax.set_title('Performance of Traditional Risk Models', 
                  fontsize=16, fontweight='bold')
     ax.set_xticks(x + width)
     ax.set_xticklabels(display_names, rotation=45, ha='right')
@@ -144,12 +172,12 @@ def create_figure_clinic_free_models(df):
     """Figure for Clinic-Free Models"""
     
     # Filter for clinic-free models
-    clinic_free_models = ['PCE_Clinic_Free', 'PCE_Clinic_Free + Self Reported Physical Activity', 
-                         'PCE_Clinic_Free + Accel', 'PCE_Clinic_Free + Accel Various',
-                         'SCORE_Clinic_Free', 'SCORE_Clinic_Free + Self Reported Physical Activity',
-                         'SCORE_Clinic_Free + Accel', 'SCORE_Clinic_Free + Accel Various',
-                         'LE8_Clinic_Free', 'LE8_Clinic_Free + Self Reported Physical Activity',
-                         'LE8_Clinic_Free + Accel', 'LE8_Clinic_Free + Accel Various']
+    clinic_free_models = ['PCE Clinic-Free', 'PCE Clinic-Free + Self Reported Physical Activity', 
+                         'PCE Clinic-Free + Total MIMS', 'PCE Clinic-Free + Acc-Driven MVPA',
+                         'SCORE Clinic-Free', 'SCORE Clinic-Free + Self Reported Physical Activity',
+                         'SCORE Clinic-Free + Total MIMS', 'SCORE Clinic-Free + Acc-Driven MVPA',
+                         'LE8 Clinic-Free', 'LE8 Clinic-Free + Self Reported Physical Activity',
+                         'LE8 Clinic-Free + Total MIMS', 'LE8 Clinic-Free + Acc-Driven MVPA']
     
     # Filter data for these models
     filtered_data = df[df['Model'].isin(clinic_free_models)].copy()
@@ -228,12 +256,12 @@ def create_figure_reasonable_clinic_free_models(df):
     """Figure for Reasonable Clinic-Free Models (Including Blood Pressure)"""
     
     # Filter for reasonable clinic-free models
-    reasonable_models = ['PCE_Reasonable_Clinic_Free', 'PCE_Reasonable_Clinic_Free + Self Reported Physical Activity',
-                        'PCE_Reasonable_Clinic_Free + Accel', 'PCE_Reasonable_Clinic_Free + Accel Various',
-                        'SCORE_Reasonable_Clinic_Free', 'SCORE_Reasonable_Clinic_Free + Self Reported Physical Activity',
-                        'SCORE_Reasonable_Clinic_Free + Accel', 'SCORE_Reasonable_Clinic_Free + Accel Various',
-                        'LE8_Reasonable_Clinic_Free', 'LE8_Reasonable_Clinic_Free + Self Reported Physical Activity',
-                        'LE8_Reasonable_Clinic_Free + Accel', 'LE8_Reasonable_Clinic_Free + Accel Various']
+    reasonable_models = ['PCE Reasonable Clinic-Free', 'PCE Reasonable Clinic-Free + Self Reported Physical Activity',
+                        'PCE Reasonable Clinic-Free + Total MIMS', 'PCE Reasonable Clinic-Free + Acc-Driven MVPA',
+                        'SCORE Reasonable Clinic-Free', 'SCORE Reasonable Clinic-Free + Self Reported Physical Activity',
+                        'SCORE Reasonable Clinic-Free + Total MIMS', 'SCORE Reasonable Clinic-Free + Acc-Driven MVPA',
+                        'LE8 Reasonable Clinic-Free', 'LE8 Reasonable Clinic-Free + Self Reported Physical Activity',
+                        'LE8 Reasonable Clinic-Free + Total MIMS', 'LE8 Reasonable Clinic-Free + Acc-Driven MVPA']
     
     # Filter data for these models
     filtered_data = df[df['Model'].isin(reasonable_models)].copy()
@@ -312,10 +340,10 @@ def create_figure_sociodemographic_models(df):
     """Figure for Performance with Sociodemographic Variables Only"""
     
     # Filter for sociodemographic models
-    socio_models = ['Demographics', 'Demographics + Self Reported Physical Activity',
-                   'Demographics + Accel', 'Demographics + Accel Various',
+    socio_models = ['DEMO', 'DEMO + Self Reported Physical Activity',
+                   'DEMO + Total MIMS', 'DEMO + Acc-Driven MVPA',
                    'SDOH', 'SDOH + Self Reported Physical Activity',
-                   'SDOH + Accel', 'SDOH + Accel Various']
+                   'SDOH + Total MIMS', 'SDOH + Acc-Driven MVPA']
     
     # Filter data for these models
     filtered_data = df[df['Model'].isin(socio_models)].copy()
@@ -378,7 +406,7 @@ def create_figure_sociodemographic_models(df):
     
     ax.set_xlabel('Model')
     ax.set_ylabel('ROC AUC with 95% CI')
-    ax.set_title('Performance with Sociodemographic Variables Only', 
+    ax.set_title('Performance of Sociodemographic Models', 
                  fontsize=16, fontweight='bold')
     ax.set_xticks(x + width)
     ax.set_xticklabels(display_names, rotation=45, ha='right')
