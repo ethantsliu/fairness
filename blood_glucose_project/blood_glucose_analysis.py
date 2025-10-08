@@ -337,7 +337,7 @@ class NHANESGlucoseAnalyzer:
         plt.title('Global Feature Importance (Glucose Prediction)')
         plt.gca().invert_yaxis()
         plt.tight_layout()
-        plt.savefig('/Users/aakashsuresh/fairness/glucose_feature_importance.png', dpi=300, bbox_inches='tight')
+        plt.savefig('/Users/aakashsuresh/fairness/blood_glucose_project/figures/glucose_feature_importance.png', dpi=300, bbox_inches='tight')
         plt.show()
         
         # SHAP summary plot would go here (requires proper SHAP setup)
@@ -465,7 +465,7 @@ class NHANESGlucoseAnalyzer:
             axes[1, i].tick_params(axis='x', rotation=45)
         
         plt.tight_layout()
-        plt.savefig('/Users/aakashsuresh/fairness/fairness_evaluation.png', dpi=300, bbox_inches='tight')
+        plt.savefig('/Users/aakashsuresh/fairness/blood_glucose_project/figures/fairness_evaluation.png', dpi=300, bbox_inches='tight')
         plt.show()
         
         print("Fairness evaluation plot saved as 'fairness_evaluation.png'")
