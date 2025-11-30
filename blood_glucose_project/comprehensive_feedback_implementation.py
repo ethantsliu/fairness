@@ -549,6 +549,7 @@ class ComprehensiveFeedbackImplementation:
         print("\n=== Generating Journal Submission Summary ===")
         
         summary = f"""
+        
 # Journal Submission Summary: All Feedback Implemented
 
 ## Target Journal Options
