@@ -379,11 +379,11 @@ class WearableFairnessAnalyzer:
             'weekend_proportion', 'total_monitoring_days'
         ]
         
-        # Clean data
-        analysis_data = self.stratified_data.dropna(subset=feature_cols + ['LBXGLU_first'])
+        # Clean data and create a stable index we can track through train/test splits
+        analysis_data = self.stratified_data.dropna(subset=feature_cols + ['LBXGLU_first']).reset_index(drop=True)
         
-        X = analysis_data[feature_cols]
-        y_glucose = analysis_data['LBXGLU_first']
+        X = analysis_data[feature_cols].values
+        y_glucose = analysis_data['LBXGLU_first'].values
         
         # Create diabetes risk classification (fasting glucose >= 126 mg/dL)
         y_diabetes = (y_glucose >= 126).astype(int)
@@ -396,10 +396,14 @@ class WearableFairnessAnalyzer:
         clf = RandomForestClassifier(n_estimators=100, random_state=42)
         reg = RandomForestRegressor(n_estimators=100, random_state=42)
         
-        # Split data
-        X_train, X_test, y_class_train, y_class_test, y_reg_train, y_reg_test = train_test_split(
-            X_scaled, y_diabetes, y_glucose, test_size=0.3, random_state=42, stratify=y_diabetes
+        # Split data using explicit indices so we can reliably map back to participant-level features
+        indices = np.arange(len(analysis_data))
+        X_train_idx, X_test_idx, y_class_train, y_class_test, y_reg_train, y_reg_test = train_test_split(
+            indices, y_diabetes, y_glucose, test_size=0.3, random_state=42, stratify=y_diabetes
         )
+        
+        X_train = X_scaled[X_train_idx]
+        X_test = X_scaled[X_test_idx]
         
         # Train models
         clf.fit(X_train, y_class_train)
@@ -410,13 +414,18 @@ class WearableFairnessAnalyzer:
         y_class_prob = clf.predict_proba(X_test)[:, 1]
         y_reg_pred = reg.predict(X_test)
         
-        # Get test data indices for stratification
-        test_indices = analysis_data.iloc[X_test.shape[0]:].index if X_test.shape[0] < len(analysis_data) else analysis_data.index[-len(X_test):]
-        test_data = analysis_data.loc[test_indices].reset_index(drop=True)
+        # Map test set back to participant-level features
+        test_data = analysis_data.iloc[X_test_idx].reset_index(drop=True)
         
-        # Ensure alignment
-        if len(test_data) != len(y_class_test):
-            test_data = analysis_data.iloc[-len(y_class_test):].reset_index(drop=True)
+        # Persist key artifacts for downstream regression analyses
+        self.analysis_data = analysis_data
+        self.test_indices = X_test_idx
+        self.test_data = test_data
+        self.y_class_test = y_class_test
+        self.y_class_pred = y_class_pred
+        self.y_class_prob = y_class_prob
+        self.y_reg_test = y_reg_test
+        self.y_reg_pred = y_reg_pred
         
         # Analyze fairness across different stratification variables
         stratification_vars = [
@@ -457,7 +466,151 @@ class WearableFairnessAnalyzer:
                     'regression': reg_fairness
                 }
         
+        # After computing group-wise fairness, run continuous-factor regression analyses
+        self.performance_regression_results = self.run_performance_regressions()
+        
         return self.fairness_results
+
+    def run_performance_regressions(self, factors=None, n_bootstrap=1000, sample_frac=0.8):
+        """
+        Run regression analyses relating continuous wearable factors to model performance.
+        
+        For each factor, we regress a binary correctness indicator (1 = correct
+        classification, 0 = incorrect) on the continuous factor using ordinary
+        least squares via scipy.stats.linregress, and compute:
+          - R^2 (squared Pearson correlation)
+          - p-value for non-zero slope
+        
+        To provide uncertainty, we also run bootstrap-style resampling of 80% of the
+        test set for `n_bootstrap` iterations and report mean ± standard deviation
+        of R^2 and p-value across resamples.
+        """
+        if not hasattr(self, "test_data") or self.test_data is None:
+            print("⚠️ No stored test_data found; skipping performance regressions.")
+            return {}
+        
+        if factors is None:
+            factors = [
+                'avg_daily_wear_hours',
+                'data_quality_ratio_mean',
+                'wear_time_variability',
+                'weekend_proportion',
+                'total_monitoring_days',
+            ]
+        
+        results = {}
+        
+        # Correctness indicator for classification performance
+        correct = (self.y_class_test == self.y_class_pred).astype(int)
+        n_test = len(correct)
+        
+        for factor in factors:
+            if factor not in self.test_data.columns:
+                continue
+            
+            x = self.test_data[factor].values
+            mask = ~np.isnan(x)
+            
+            x_valid = x[mask]
+            y_valid = correct[mask]
+            
+            if len(x_valid) < 10:
+                continue
+            
+            # Full-sample regression
+            lr_full = stats.linregress(x_valid, y_valid)
+            r2_full = lr_full.rvalue ** 2
+            
+            # Bootstrap resampling (80% of test set per iteration, without replacement)
+            boot_r2 = []
+            boot_p = []
+            
+            sample_size = max(5, int(sample_frac * len(x_valid)))
+            
+            for _ in range(n_bootstrap):
+                idx = np.random.choice(len(x_valid), size=sample_size, replace=False)
+                lr = stats.linregress(x_valid[idx], y_valid[idx])
+                boot_r2.append(lr.rvalue ** 2)
+                boot_p.append(lr.pvalue)
+            
+            results[factor] = {
+                "r2_full": r2_full,
+                "p_full": lr_full.pvalue,
+                "slope_full": lr_full.slope,
+                "intercept_full": lr_full.intercept,
+                "r2_mean": float(np.mean(boot_r2)),
+                "r2_std": float(np.std(boot_r2, ddof=1)),
+                "p_mean": float(np.mean(boot_p)),
+                "p_std": float(np.std(boot_p, ddof=1)),
+                "n": int(len(x_valid)),
+            }
+        
+        # Create a key visualization: wear time vs performance
+        if 'avg_daily_wear_hours' in results:
+            try:
+                self._plot_wear_time_vs_performance(results['avg_daily_wear_hours'])
+            except Exception as e:
+                print(f"⚠️ Could not create wear time vs performance plot: {e}")
+        
+        return results
+
+    def _plot_wear_time_vs_performance(self, wear_time_regression_result):
+        """
+        Create a plot with x-axis = average daily wear hours and y-axis = classification performance.
+        
+        Performance is defined as the binary correctness indicator (1 = correct, 0 = incorrect)
+        for each participant in the held-out test set. We overlay the fitted regression line
+        and annotate the mean bootstrapped R^2 and p-value.
+        """
+        wear_time = self.test_data['avg_daily_wear_hours'].values
+        correct = (self.y_class_test == self.y_class_pred).astype(int)
+        
+        mask = ~np.isnan(wear_time)
+        wear_time = wear_time[mask]
+        correct = correct[mask]
+        
+        if len(wear_time) < 10:
+            print("⚠️ Insufficient data to plot wear time vs performance.")
+            return
+        
+        # Fit line using full-sample regression parameters
+        slope = wear_time_regression_result["slope_full"]
+        intercept = wear_time_regression_result["intercept_full"]
+        x_line = np.linspace(wear_time.min(), wear_time.max(), 100)
+        y_line = intercept + slope * x_line
+        
+        plt.figure(figsize=(8, 6))
+        sns.scatterplot(x=wear_time, y=correct, alpha=0.3, s=20)
+        plt.plot(x_line, y_line, color='red', linewidth=2, label='Linear fit')
+        
+        r2_mean = wear_time_regression_result["r2_mean"]
+        r2_std = wear_time_regression_result["r2_std"]
+        p_mean = wear_time_regression_result["p_mean"]
+        p_std = wear_time_regression_result["p_std"]
+        
+        plt.xlabel('Average Daily Wear Time (hours)')
+        plt.ylabel('Classification Performance (Correct = 1, Incorrect = 0)')
+        plt.title('Wear Time vs Model Performance\nwith Bootstrapped Regression')
+        
+        annotation = (
+            f"R² (mean ± SD): {r2_mean:.3f} ± {r2_std:.3f}\n"
+            f"p-value (mean ± SD): {p_mean:.3e} ± {p_std:.3e}"
+        )
+        plt.legend()
+        plt.text(
+            0.05, 0.95, annotation,
+            transform=plt.gca().transAxes,
+            verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+            fontsize=9,
+        )
+        
+        output_path = "/Users/aakashsuresh/fairness/blood_glucose_project/results/figures/wear_time_vs_performance.png"
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300)
+        plt.close()
+        
+        print(f"✅ Wear time vs performance plot saved to: {output_path}")
     
     def create_fairness_visualizations(self):
         """Create comprehensive fairness visualizations."""
@@ -877,6 +1030,16 @@ class WearableFairnessAnalyzer:
         report.append("• **Equalized Odds**: Equal TPR and FPR across groups")
         report.append("• **Calibration**: Equal positive predictive values across groups")
         report.append("• **MAE Disparity**: Difference in mean absolute error across groups")
+        
+        report.append("\n### Definitions of Data Quality and \"Poor\" Fairness:")
+        report.append("• **Data Quality Ratio**: valid wear minutes / total daily wear minutes.")
+        report.append("• **Poor Data Quality (categorical)**: data quality ratio < 0.70;")
+        report.append("  Fair, Good, and Excellent quality correspond to higher ratio bins as defined in the stratification.")
+        report.append("• **Poor Fairness for Classification Metrics**: any of")
+        report.append("  Statistical Parity Difference, Equal Opportunity Difference, or Equalized Odds Difference ≥ 0.10.")
+        report.append("• **Poor Calibration**: Calibration Difference (PPV disparity across groups) ≥ 0.10.")
+        report.append("• **Poor Regression Fairness**: MAE Disparity ≥ 5 mg/dL across groups.")
+        report.append("These thresholds apply uniformly across all fairness metrics, not only PPV.")
         
         report.append("\n### Fairness Thresholds Used:")
         report.append("• Excellent: All metrics < 0.05, MAE disparity < 2 mg/dL")
