@@ -638,10 +638,49 @@ class LifestyleGlucoseAnalyzer:
             fairness_results['race'] = race_results
         
         self.create_lifestyle_fairness_visualizations(fairness_results)
+        self.export_fairness_results(
+            fairness_results,
+            "/Users/aakashsuresh/fairness/blood_glucose_project/results/fairness_lifestyle_bootstrap.csv",
+            model_label="Lifestyle Model"
+        )
         
         return fairness_results
     
-    def evaluate_subgroup_fairness(self, df, group_col, group_mapping=None):
+    def _bootstrap_group_mae(self, group_data, n_bootstrap=1000, ci=0.95, random_state=42):
+        """Bootstrap MAE metrics for a subgroup."""
+        n = len(group_data)
+        if n < 2:
+            return None
+
+        rng = np.random.default_rng(random_state)
+        glucose_true = group_data['glucose_true'].to_numpy()
+        glucose_pred = group_data['glucose_pred'].to_numpy()
+        hba1c_true = group_data['hba1c_true'].to_numpy()
+        hba1c_pred = group_data['hba1c_pred'].to_numpy()
+
+        glucose_boot = np.empty(n_bootstrap)
+        hba1c_boot = np.empty(n_bootstrap)
+        for i in range(n_bootstrap):
+            idx = rng.integers(0, n, size=n)
+            glucose_boot[i] = np.mean(np.abs(glucose_true[idx] - glucose_pred[idx]))
+            hba1c_boot[i] = np.mean(np.abs(hba1c_true[idx] - hba1c_pred[idx]))
+
+        alpha = (1 - ci) / 2
+        glucose_ci = np.quantile(glucose_boot, [alpha, 1 - alpha])
+        hba1c_ci = np.quantile(hba1c_boot, [alpha, 1 - alpha])
+
+        return {
+            'glucose_mean': float(np.mean(glucose_boot)),
+            'glucose_std': float(np.std(glucose_boot, ddof=1)),
+            'glucose_ci_low': float(glucose_ci[0]),
+            'glucose_ci_high': float(glucose_ci[1]),
+            'hba1c_mean': float(np.mean(hba1c_boot)),
+            'hba1c_std': float(np.std(hba1c_boot, ddof=1)),
+            'hba1c_ci_low': float(hba1c_ci[0]),
+            'hba1c_ci_high': float(hba1c_ci[1])
+        }
+
+    def evaluate_subgroup_fairness(self, df, group_col, group_mapping=None, n_bootstrap=1000):
         """
         Evaluate fairness metrics for a specific demographic subgroup
         """
@@ -660,11 +699,23 @@ class LifestyleGlucoseAnalyzer:
             # Calculate MAE for glucose and HbA1c
             glucose_mae = mean_absolute_error(group_data['glucose_true'], group_data['glucose_pred'])
             hba1c_mae = mean_absolute_error(group_data['hba1c_true'], group_data['hba1c_pred'])
+
+            bootstrap = None
+            if len(group_data) >= 10:
+                bootstrap = self._bootstrap_group_mae(group_data, n_bootstrap=n_bootstrap)
             
             results[group_name] = {
                 'n': len(group_data),
                 'glucose_mae': glucose_mae,
                 'hba1c_mae': hba1c_mae,
+                'glucose_mae_mean': bootstrap['glucose_mean'] if bootstrap else glucose_mae,
+                'glucose_mae_std': bootstrap['glucose_std'] if bootstrap else 0.0,
+                'glucose_mae_ci95_low': bootstrap['glucose_ci_low'] if bootstrap else glucose_mae,
+                'glucose_mae_ci95_high': bootstrap['glucose_ci_high'] if bootstrap else glucose_mae,
+                'hba1c_mae_mean': bootstrap['hba1c_mean'] if bootstrap else hba1c_mae,
+                'hba1c_mae_std': bootstrap['hba1c_std'] if bootstrap else 0.0,
+                'hba1c_mae_ci95_low': bootstrap['hba1c_ci_low'] if bootstrap else hba1c_mae,
+                'hba1c_mae_ci95_high': bootstrap['hba1c_ci_high'] if bootstrap else hba1c_mae,
                 'glucose_mean_true': group_data['glucose_true'].mean(),
                 'hba1c_mean_true': group_data['hba1c_true'].mean()
             }
@@ -673,12 +724,12 @@ class LifestyleGlucoseAnalyzer:
         print(f"\nLifestyle Model Fairness by {group_col}:")
         for group_name, metrics in results.items():
             print(f"  {group_name} (n={metrics['n']}):")
-            print(f"    Glucose MAE: {metrics['glucose_mae']:.3f} mg/dL")
-            print(f"    HbA1c MAE:   {metrics['hba1c_mae']:.3f}%")
+            print(f"    Glucose MAE: {metrics['glucose_mae_mean']:.3f} ± {metrics['glucose_mae_std']:.3f} mg/dL")
+            print(f"    HbA1c MAE:   {metrics['hba1c_mae_mean']:.3f} ± {metrics['hba1c_mae_std']:.3f}%")
         
         return results
     
-    def create_lifestyle_fairness_visualizations(self, fairness_results):
+    def create_lifestyle_fairness_visualizations(self, fairness_results, error_bar='std'):
         """
         Create lifestyle model fairness visualizations
         """
@@ -693,17 +744,37 @@ class LifestyleGlucoseAnalyzer:
                 break
                 
             groups = list(results.keys())
-            glucose_mae = [results[g]['glucose_mae'] for g in groups]
-            hba1c_mae = [results[g]['hba1c_mae'] for g in groups]
+            glucose_mae = [results[g].get('glucose_mae_mean', results[g]['glucose_mae']) for g in groups]
+            hba1c_mae = [results[g].get('hba1c_mae_mean', results[g]['hba1c_mae']) for g in groups]
+            if error_bar == 'ci95':
+                glucose_err = [
+                    [
+                        results[g]['glucose_mae_mean'] - results[g].get('glucose_mae_ci95_low', results[g]['glucose_mae_mean']),
+                        results[g].get('glucose_mae_ci95_high', results[g]['glucose_mae_mean']) - results[g]['glucose_mae_mean']
+                    ]
+                    for g in groups
+                ]
+                hba1c_err = [
+                    [
+                        results[g]['hba1c_mae_mean'] - results[g].get('hba1c_mae_ci95_low', results[g]['hba1c_mae_mean']),
+                        results[g].get('hba1c_mae_ci95_high', results[g]['hba1c_mae_mean']) - results[g]['hba1c_mae_mean']
+                    ]
+                    for g in groups
+                ]
+                glucose_err = np.array(glucose_err).T
+                hba1c_err = np.array(hba1c_err).T
+            else:
+                glucose_err = [results[g].get('glucose_mae_std', 0.0) for g in groups]
+                hba1c_err = [results[g].get('hba1c_mae_std', 0.0) for g in groups]
             
             # Glucose MAE
-            axes[0, i].bar(groups, glucose_mae, alpha=0.7, color='skyblue')
+            axes[0, i].bar(groups, glucose_mae, yerr=glucose_err, capsize=4, alpha=0.7, color='skyblue')
             axes[0, i].set_title(f'Glucose MAE by {group_type.title()}\n(Lifestyle Model)')
             axes[0, i].set_ylabel('MAE (mg/dL)')
             axes[0, i].tick_params(axis='x', rotation=45)
             
             # HbA1c MAE
-            axes[1, i].bar(groups, hba1c_mae, alpha=0.7, color='lightcoral')
+            axes[1, i].bar(groups, hba1c_mae, yerr=hba1c_err, capsize=4, alpha=0.7, color='lightcoral')
             axes[1, i].set_title(f'HbA1c MAE by {group_type.title()}\n(Lifestyle Model)')
             axes[1, i].set_ylabel('MAE (%)')
             axes[1, i].tick_params(axis='x', rotation=45)
@@ -714,6 +785,31 @@ class LifestyleGlucoseAnalyzer:
         plt.show()
         
         print("Lifestyle fairness evaluation plot saved as 'lifestyle_fairness_evaluation.png'")
+
+    def export_fairness_results(self, fairness_results, output_path, model_label):
+        """Save fairness results with bootstrap summaries to CSV."""
+        rows = []
+        for group_type, results in fairness_results.items():
+            for group_name, metrics in results.items():
+                rows.append({
+                    'model': model_label,
+                    'group_type': group_type,
+                    'group': group_name,
+                    'n': metrics.get('n', 0),
+                    'glucose_mae_mean': metrics.get('glucose_mae_mean', metrics.get('glucose_mae')),
+                    'glucose_mae_std': metrics.get('glucose_mae_std', 0.0),
+                    'glucose_mae_ci95_low': metrics.get('glucose_mae_ci95_low', metrics.get('glucose_mae')),
+                    'glucose_mae_ci95_high': metrics.get('glucose_mae_ci95_high', metrics.get('glucose_mae')),
+                    'hba1c_mae_mean': metrics.get('hba1c_mae_mean', metrics.get('hba1c_mae')),
+                    'hba1c_mae_std': metrics.get('hba1c_mae_std', 0.0),
+                    'hba1c_mae_ci95_low': metrics.get('hba1c_mae_ci95_low', metrics.get('hba1c_mae')),
+                    'hba1c_mae_ci95_high': metrics.get('hba1c_mae_ci95_high', metrics.get('hba1c_mae')),
+                })
+
+        if rows:
+            df = pd.DataFrame(rows)
+            df.to_csv(output_path, index=False)
+            print(f"Fairness bootstrap results saved to {output_path}")
     
     def run_complete_lifestyle_analysis(self):
         """

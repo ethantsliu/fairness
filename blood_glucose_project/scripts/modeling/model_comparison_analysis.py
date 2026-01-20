@@ -7,6 +7,7 @@ Author: Generated for fairness project
 Date: October 2025
 """
 
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -123,39 +124,80 @@ def create_fairness_comparison():
     """
     Compare fairness metrics between the two models
     """
-    # Fairness data from both models
+    lab_path = "/Users/aakashsuresh/fairness/blood_glucose_project/results/fairness_lab_bootstrap.csv"
+    lifestyle_path = "/Users/aakashsuresh/fairness/blood_glucose_project/results/fairness_lifestyle_bootstrap.csv"
+
+    def plot_model_fairness(df, model_label, output_path):
+        group_types = list(df['group_type'].unique())
+        n = len(group_types)
+        fig, axes = plt.subplots(1, n, figsize=(5 * n, 5))
+        if n == 1:
+            axes = [axes]
+
+        for i, group_type in enumerate(group_types):
+            subset = df[df['group_type'] == group_type].copy()
+            subset = subset.sort_values('group')
+            groups = subset['group'].tolist()
+            means = subset['glucose_mae_mean'].tolist()
+            errs = subset['glucose_mae_std'].tolist()
+
+            axes[i].bar(groups, means, yerr=errs, capsize=4, alpha=0.7, color='skyblue')
+            axes[i].set_title(f'{model_label}\nGlucose MAE by {group_type.title()}')
+            axes[i].set_ylabel('MAE (mg/dL)')
+            axes[i].tick_params(axis='x', rotation=45)
+            axes[i].grid(axis='y', alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.show()
+
+    if os.path.exists(lab_path) and os.path.exists(lifestyle_path):
+        lab_df = pd.read_csv(lab_path)
+        lifestyle_df = pd.read_csv(lifestyle_path)
+
+        plot_model_fairness(
+            lab_df,
+            "Lab-Proxy Model",
+            "/Users/aakashsuresh/fairness/blood_glucose_project/figures/fairness_comparison_lab.png"
+        )
+        plot_model_fairness(
+            lifestyle_df,
+            "Lifestyle Model",
+            "/Users/aakashsuresh/fairness/blood_glucose_project/figures/fairness_comparison_lifestyle.png"
+        )
+
+        print("Fairness comparison visualizations saved as separate lab/lifestyle plots.")
+        return pd.concat([lab_df, lifestyle_df], ignore_index=True)
+
+    # Fallback: static data if bootstrap outputs are missing
     fairness_data = {
         'Demographic Group': ['Male', 'Female', '<40 years', '40-60 years', '>60 years'],
         'Lab-Proxy MAE': [2.658, 2.646, 2.526, 2.486, 3.008],
         'Lifestyle MAE': [21.950, 19.101, 12.434, 25.549, 23.847]
     }
-    
+
     df_fairness = pd.DataFrame(fairness_data)
-    
+
     plt.figure(figsize=(12, 6))
-    
     x = np.arange(len(df_fairness['Demographic Group']))
     width = 0.35
-    
-    plt.bar(x - width/2, df_fairness['Lab-Proxy MAE'], width, 
-           label='Lab-Proxy Model', color='lightcoral', alpha=0.7)
-    plt.bar(x + width/2, df_fairness['Lifestyle MAE'], width, 
-           label='Lifestyle Model', color='skyblue', alpha=0.7)
-    
+    plt.bar(x - width/2, df_fairness['Lab-Proxy MAE'], width,
+            label='Lab-Proxy Model', color='lightcoral', alpha=0.7)
+    plt.bar(x + width/2, df_fairness['Lifestyle MAE'], width,
+            label='Lifestyle Model', color='skyblue', alpha=0.7)
     plt.xlabel('Demographic Groups')
     plt.ylabel('MAE (mg/dL)')
     plt.title('Fairness Comparison: MAE Across Demographic Groups')
     plt.xticks(x, df_fairness['Demographic Group'], rotation=45)
     plt.legend()
     plt.grid(axis='y', alpha=0.3)
-    
     plt.tight_layout()
-    plt.savefig('/Users/aakashsuresh/fairness/blood_glucose_project/figures/fairness_comparison.png', 
-               dpi=300, bbox_inches='tight')
+    plt.savefig('/Users/aakashsuresh/fairness/blood_glucose_project/figures/fairness_comparison.png',
+                dpi=300, bbox_inches='tight')
     plt.show()
-    
-    print("Fairness comparison visualization saved as 'fairness_comparison.png'")
-    
+
+    print("Fairness comparison visualization saved as 'fairness_comparison.png' (fallback).")
+
     return df_fairness
 
 def print_clinical_insights():
