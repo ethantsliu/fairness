@@ -27,8 +27,8 @@ class ImprovedFeatureEngineer:
     """
     
     def __init__(self, 
-                 lab_data_dir="/Users/aakashsuresh/fairness/processed_data_nhanes_lab/",
-                 lifestyle_data_dir="/Users/aakashsuresh/fairness/processed_data_new/"):
+                 lab_data_dir="/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_lab/",
+                 lifestyle_data_dir="/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/"):
         self.lab_data_dir = lab_data_dir
         self.lifestyle_data_dir = lifestyle_data_dir
         self.mysterious_value = 5.397605346934028e-79

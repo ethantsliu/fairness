@@ -39,7 +39,7 @@ class WearableFairnessAnalyzer:
     Comprehensive algorithmic fairness analyzer for wearable-based glucose prediction.
     """
     
-    def __init__(self, data_path="/Users/aakashsuresh/fairness/processed_data_new"):
+    def __init__(self, data_path="/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined"):
         self.data_path = data_path
         self.results = {}
         self.fairness_metrics = {}

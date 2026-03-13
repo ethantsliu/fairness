@@ -28,7 +28,7 @@ def load_data():
     """Load and examine the data structure."""
     print("🔄 Loading data...")
     
-    data_path = "/Users/aakashsuresh/fairness/processed_data_new"
+    data_path = "/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined"
     
     try:
         # Load accelerometry data

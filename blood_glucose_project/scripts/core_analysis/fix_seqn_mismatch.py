@@ -26,8 +26,8 @@ class SEQNMismatchFixer:
     """
     
     def __init__(self):
-        self.processed_data_new = "/Users/aakashsuresh/fairness/processed_data_new/"
-        self.processed_data_lab = "/Users/aakashsuresh/fairness/processed_data_nhanes_lab/"
+        self.processed_data_new = "/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/"
+        self.processed_data_lab = "/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_lab/"
         self.mysterious_value = 5.397605346934028e-79
         
     def load_matching_glucose_data(self):

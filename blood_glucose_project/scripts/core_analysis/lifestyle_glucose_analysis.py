@@ -23,6 +23,7 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.cluster import KMeans
 import shap
+from scipy import stats
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -36,8 +37,8 @@ class LifestyleGlucoseAnalyzer:
     """
     
     def __init__(self, 
-                 lab_data_dir="/Users/aakashsuresh/fairness/processed_data_nhanes_lab/",
-                 lifestyle_data_dir="/Users/aakashsuresh/fairness/processed_data_new/"):
+                 lab_data_dir="/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_lab/",
+                 lifestyle_data_dir="/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/"):
         self.lab_data_dir = lab_data_dir
         self.lifestyle_data_dir = lifestyle_data_dir
         self.df = None
@@ -51,6 +52,11 @@ class LifestyleGlucoseAnalyzer:
         self.model = None
         self.baseline_model = None
         self.feature_names = None
+
+    def ensure_output_dirs(self):
+        """Ensure output directories exist."""
+        os.makedirs("/Users/aakashsuresh/fairness/blood_glucose_project/figures", exist_ok=True)
+        os.makedirs("/Users/aakashsuresh/fairness/blood_glucose_project/results", exist_ok=True)
         
     def load_glucose_targets(self):
         """
@@ -638,6 +644,8 @@ class LifestyleGlucoseAnalyzer:
             fairness_results['race'] = race_results
         
         self.create_lifestyle_fairness_visualizations(fairness_results)
+        self.plot_age_error_relationship(test_df, model_label="Lifestyle Model")
+        self.analyze_subgroup_discrepancies(test_df, fairness_results)
         self.export_fairness_results(
             fairness_results,
             "/Users/aakashsuresh/fairness/blood_glucose_project/results/fairness_lifestyle_bootstrap.csv",
@@ -786,6 +794,155 @@ class LifestyleGlucoseAnalyzer:
         
         print("Lifestyle fairness evaluation plot saved as 'lifestyle_fairness_evaluation.png'")
 
+    def _quadratic_regression_stats(self, x, y):
+        """Quadratic regression with R² and overall model p-value."""
+        x = np.asarray(x)
+        y = np.asarray(y)
+        X = np.column_stack([np.ones_like(x), x, x ** 2])
+        beta, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
+        y_hat = X @ beta
+        ss_res = np.sum((y - y_hat) ** 2)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
+
+        df_model = 2
+        df_res = len(y) - 3
+        if df_res > 0:
+            ms_model = (ss_tot - ss_res) / df_model
+            ms_res = ss_res / df_res if df_res > 0 else np.nan
+            f_stat = ms_model / ms_res if ms_res > 0 else 0.0
+            p_value = stats.f.sf(f_stat, df_model, df_res) if ms_res > 0 else 1.0
+        else:
+            f_stat = 0.0
+            p_value = 1.0
+
+        return beta, r2, p_value
+
+    def plot_age_error_relationship(self, test_df, model_label):
+        """Plot age vs absolute error with quadratic regression."""
+        os.makedirs("/Users/aakashsuresh/fairness/blood_glucose_project/figures", exist_ok=True)
+        os.makedirs("/Users/aakashsuresh/fairness/blood_glucose_project/results", exist_ok=True)
+
+        age = test_df['age'].values
+        glucose_error = np.abs(test_df['glucose_true'] - test_df['glucose_pred'])
+        hba1c_error = np.abs(test_df['hba1c_true'] - test_df['hba1c_pred'])
+
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+        regression_rows = []
+
+        for ax, y, label in [
+            (axes[0], glucose_error, "Glucose MAE"),
+            (axes[1], hba1c_error, "HbA1c MAE")
+        ]:
+            beta, r2, p_value = self._quadratic_regression_stats(age, y)
+            x_sorted = np.linspace(age.min(), age.max(), 200)
+            y_fit = beta[0] + beta[1] * x_sorted + beta[2] * x_sorted ** 2
+
+            ax.scatter(age, y, alpha=0.25, s=10, color='tab:blue')
+            ax.plot(x_sorted, y_fit, color='tab:red', linewidth=2)
+            ax.set_xlabel("Age (years)")
+            ax.set_ylabel(label)
+            ax.set_title(f"{model_label}: {label} vs Age")
+            ax.text(0.02, 0.98, f"Quadratic R²={r2:.3f}\\nP={p_value:.3e}",
+                    transform=ax.transAxes, va='top', ha='left')
+
+            regression_rows.append({
+                'model': model_label,
+                'outcome': label,
+                'n': len(age),
+                'beta0': beta[0],
+                'beta1': beta[1],
+                'beta2': beta[2],
+                'r2': r2,
+                'p_value': p_value
+            })
+
+        plt.tight_layout()
+        output_path = "/Users/aakashsuresh/fairness/blood_glucose_project/figures/age_error_relationship_lifestyle.png"
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.show()
+        print(f"Age vs error plot saved as '{os.path.basename(output_path)}'")
+
+        results_df = pd.DataFrame(regression_rows)
+        results_df.to_csv("/Users/aakashsuresh/fairness/blood_glucose_project/results/age_error_regression_lifestyle.csv",
+                          index=False)
+        print("Age regression stats saved to results/age_error_regression_lifestyle.csv")
+
+    def analyze_subgroup_discrepancies(self, test_df, fairness_results):
+        """Assess whether subgroup MAE relates to sample size or heterogeneity."""
+        rows = []
+        group_col_map = {
+            'gender': 'gender',
+            'age': 'age_group',
+            'bmi': 'bmi_group',
+            'race': 'race_ethnicity'
+        }
+        group_label_map = {
+            'gender': {0: 'Male', 1: 'Female'},
+            'race': {0: 'Group_0', 1: 'Group_1', 2: 'Group_2', 3: 'Group_3'}
+        }
+
+        for group_type, results in fairness_results.items():
+            group_col = group_col_map.get(group_type)
+            if group_col is None or group_col not in test_df.columns:
+                continue
+
+            mapping = group_label_map.get(group_type, {})
+            display_series = test_df[group_col].apply(lambda v: mapping.get(v, str(v)))
+
+            for group_name, metrics in results.items():
+                group_mask = display_series == str(group_name)
+                if group_mask.sum() == 0:
+                    continue
+
+                group_data = test_df[group_mask]
+                glucose_error = np.abs(group_data['glucose_true'] - group_data['glucose_pred'])
+                hba1c_error = np.abs(group_data['hba1c_true'] - group_data['hba1c_pred'])
+
+                rows.append({
+                    'group_type': group_type,
+                    'group': group_name,
+                    'n': len(group_data),
+                    'glucose_mae_mean': metrics.get('glucose_mae_mean', metrics.get('glucose_mae')),
+                    'glucose_error_std': float(np.std(glucose_error, ddof=1)) if len(group_data) > 1 else 0.0,
+                    'glucose_true_std': float(np.std(group_data['glucose_true'], ddof=1)) if len(group_data) > 1 else 0.0,
+                    'hba1c_mae_mean': metrics.get('hba1c_mae_mean', metrics.get('hba1c_mae')),
+                    'hba1c_error_std': float(np.std(hba1c_error, ddof=1)) if len(group_data) > 1 else 0.0,
+                    'hba1c_true_std': float(np.std(group_data['hba1c_true'], ddof=1)) if len(group_data) > 1 else 0.0,
+                })
+
+        if not rows:
+            print("No subgroup discrepancy data available.")
+            return
+
+        df = pd.DataFrame(rows)
+        output_csv = "/Users/aakashsuresh/fairness/blood_glucose_project/results/lifestyle_subgroup_diagnostics.csv"
+        df.to_csv(output_csv, index=False)
+        print(f"Subgroup diagnostics saved to {output_csv}")
+
+        if len(df) >= 3:
+            rho_n, p_n = stats.spearmanr(df['n'], df['glucose_mae_mean'])
+            rho_std, p_std = stats.spearmanr(df['glucose_true_std'], df['glucose_mae_mean'])
+            print(f"Spearman (MAE vs n): rho={rho_n:.3f}, p={p_n:.3e}")
+            print(f"Spearman (MAE vs glucose std): rho={rho_std:.3f}, p={p_std:.3e}")
+
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+        sns.scatterplot(data=df, x='n', y='glucose_mae_mean', hue='group_type', ax=axes[0])
+        axes[0].set_title('Glucose MAE vs Sample Size')
+        axes[0].set_xlabel('Sample Size (n)')
+        axes[0].set_ylabel('Glucose MAE (mg/dL)')
+
+        sns.scatterplot(data=df, x='glucose_true_std', y='glucose_mae_mean', hue='group_type', ax=axes[1])
+        axes[1].set_title('Glucose MAE vs Outcome Heterogeneity')
+        axes[1].set_xlabel('Glucose True Std Dev')
+        axes[1].set_ylabel('Glucose MAE (mg/dL)')
+
+        plt.tight_layout()
+        output_fig = "/Users/aakashsuresh/fairness/blood_glucose_project/figures/lifestyle_subgroup_diagnostics.png"
+        plt.savefig(output_fig, dpi=300, bbox_inches='tight')
+        plt.show()
+        print(f"Subgroup diagnostics plot saved as '{os.path.basename(output_fig)}'")
+
     def export_fairness_results(self, fairness_results, output_path, model_label):
         """Save fairness results with bootstrap summaries to CSV."""
         rows = []
@@ -820,6 +977,8 @@ class LifestyleGlucoseAnalyzer:
         print("CLINICALLY MEANINGFUL MODEL - NO LAB VALUE PROXIES")
         print("Use case: Screening when lab values are not available")
         print("=" * 70)
+
+        self.ensure_output_dirs()
         
         # Load and preprocess data
         self.merge_lifestyle_data()

@@ -20,7 +20,7 @@ class ActivityDataInvestigator:
     Investigate physical activity data quality and feature engineering
     """
     
-    def __init__(self, lifestyle_data_dir="/Users/aakashsuresh/fairness/processed_data_new/"):
+    def __init__(self, lifestyle_data_dir="/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/"):
         self.lifestyle_data_dir = lifestyle_data_dir
         self.acc_df = None
         self.glucose_df = None
@@ -185,8 +185,8 @@ class ActivityDataInvestigator:
         print("\n=== Loading Glucose Data for Correlation Analysis ===")
         
         # Load glucose targets
-        glucose_file = "/Users/aakashsuresh/fairness/processed_data_nhanes_lab/fasting_glucose_processed.csv"
-        hba1c_file = "/Users/aakashsuresh/fairness/processed_data_nhanes_lab/glycohemoglobin_processed.csv"
+        glucose_file = "/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_lab/fasting_glucose_processed.csv"
+        hba1c_file = "/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_lab/glycohemoglobin_processed.csv"
         
         if pd.io.common.file_exists(glucose_file) and pd.io.common.file_exists(hba1c_file):
             glucose_df = pd.read_csv(glucose_file)[['seqn', 'lbxglu']]

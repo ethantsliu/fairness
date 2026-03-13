@@ -25,7 +25,7 @@ class ClinicalValidation2017_2020:
     
     def __init__(self):
         self.base_dir = "/Users/aakashsuresh/fairness"
-        self.lab_data_dir = f"{self.base_dir}/processed_data_nhanes_lab"
+        self.lab_data_dir = f"{self.base_dir}/blood_glucose_project/data/processed/nhanes_lab"
         self.trained_models_dir = f"{self.base_dir}/blood_glucose_project"
         self.validation_output_dir = f"{self.base_dir}/blood_glucose_project/validation_results"
         

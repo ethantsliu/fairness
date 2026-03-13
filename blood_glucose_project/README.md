@@ -106,38 +106,57 @@ This project demonstrates a critical methodological insight in healthcare machin
 - **72% screening accuracy** more valuable than 99% circular prediction
 - **Clinical workflows** prefer categorical risk assessments over continuous predictions
 
-## Project Structure and Deliverables
+## Project Structure
+
+```
+blood_glucose_project/
+├── data/
+│   ├── raw/                        # Raw NHANES XPT files
+│   │   ├── nhanes_2017_2020/       # Pre-pandemic cycle
+│   │   └── nhanes_2011_2014/       # Demographics XPT
+│   ├── processed/                  # Cleaned and merged CSVs
+│   │   ├── nhanes_combined/        # Combined 2011-2014 data
+│   │   └── nhanes_lab/             # Lab-processed data
+│   └── integrated/                 # Final merged datasets
+├── notebooks/                      # Jupyter notebooks (EDA, pipelines)
+├── scripts/
+│   ├── preprocessing/              # Data cleaning, XPT conversion, merging
+│   ├── exploratory/                # Preliminary analysis and prototypes
+│   ├── core_analysis/              # Main analysis (lab-proxy vs lifestyle)
+│   ├── feature_analysis/           # Feature importance and SHAP analysis
+│   ├── modeling/                   # Classification and ensemble models
+│   └── validation/                 # Fairness evaluation, clinical validation
+├── finetuning/                     # Model fine-tuning experiments
+├── figures/                        # Generated visualizations
+├── results/                        # Output tables, reports, and PDFs
+└── documentation/                  # Manuscripts, summaries, and methodology
+```
 
 ### Core Analysis Files
-1. **`blood_glucose_analysis.py`** - Lab-proxy model (demonstrates circular reasoning problem)
-2. **`lifestyle_glucose_analysis.py`** - Initial lifestyle model (reveals true challenges)
-3. **`model_comparison_analysis.py`** - Comprehensive comparison framework
+- **`scripts/core_analysis/blood_glucose_analysis.py`** - Lab-proxy model (demonstrates circular reasoning problem)
+- **`scripts/core_analysis/lifestyle_glucose_analysis.py`** - Lifestyle model (reveals true challenges)
+- **`scripts/core_analysis/comprehensive_feedback_implementation.py`** - Full feedback pipeline
 
-### Fine-Tuning Investigation (`finetuning/` directory)
-4. **`01_activity_data_investigation.py`** - Data quality analysis and root cause investigation
-5. **`02_improved_feature_engineering.py`** - Enhanced feature creation and data cleaning
-6. **`03_advanced_modeling.py`** - Ensemble methods and hyperparameter tuning
-7. **`04_classification_focus.py`** - Clinical classification approaches
-8. **`FINETUNING_SUMMARY.md`** - Comprehensive fine-tuning analysis results
+### Fine-Tuning Investigation (`finetuning/`)
+- **`01_activity_data_investigation.py`** - Data quality analysis and root cause investigation
+- **`02_improved_feature_engineering.py`** - Enhanced feature creation and data cleaning
+- **`03_advanced_modeling.py`** - Ensemble methods and hyperparameter tuning
+- **`04_classification_focus.py`** - Clinical classification approaches
 
-### Visualizations and Results
-- **Model Performance Comparisons** - Lab-proxy vs lifestyle vs fine-tuned approaches
-- **Fairness Analysis Plots** - Demographic disparities across all model types
-- **Classification Performance** - ROC curves, confusion matrices, accuracy comparisons
-- **Feature Importance Analysis** - SHAP values and correlation analysis
-- **Data Quality Visualizations** - Activity data distributions and missing value patterns
-
-## 🔧 Technical Implementation
+## Technical Implementation
 
 ### Key Classes and Methods
 - **`NHANESGlucoseAnalyzer`** - Main analysis class
+- **`LifestyleGlucoseAnalyzer`** - Lifestyle-only analysis class
+- **`ComprehensiveFeedbackImplementation`** - Full pipeline with robustness checks
 - **Data Pipeline:** `load_and_merge_data()`, `apply_inclusion_exclusion_criteria()`, `prepare_features()`
 - **Modeling:** `train_models()`, `evaluate_models()`
 - **Analysis:** `analyze_feature_importance()`, `evaluate_fairness()`
 
-### Dependencies Installed
+### Dependencies
 - pandas, numpy, scikit-learn, matplotlib, seaborn
-- **shap** (0.48.0) - For explainability analysis
+- shap - For explainability analysis
+- scipy - For statistical analysis
 - pyreadstat - For reading NHANES .xpt files
 
 ## Summary of Results

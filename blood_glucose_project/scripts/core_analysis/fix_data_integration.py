@@ -21,8 +21,8 @@ class NHANESDataIntegrationFixer:
     
     def __init__(self):
         self.base_dir = "/Users/aakashsuresh/fairness"
-        self.processed_data_new = f"{self.base_dir}/processed_data_new"
-        self.processed_data_lab = f"{self.base_dir}/processed_data_nhanes_lab"
+        self.processed_data_new = f"{self.base_dir}/blood_glucose_project/data/processed/nhanes_combined"
+        self.processed_data_lab = f"{self.base_dir}/blood_glucose_project/data/processed/nhanes_lab"
         self.output_dir = f"{self.base_dir}/blood_glucose_project/fixed_data"
         
         # Create output directory
@@ -87,9 +87,9 @@ class NHANESDataIntegrationFixer:
     
     def check_available_files(self):
         """
-        Check what files are available in the processed_data_new directory
+        Check what files are available in the nhanes_combined directory
         """
-        print("\nAvailable files in processed_data_new:")
+        print("\nAvailable files in nhanes_combined:")
         for file in os.listdir(self.processed_data_new):
             if file.endswith('.csv'):
                 print(f"  {file}")

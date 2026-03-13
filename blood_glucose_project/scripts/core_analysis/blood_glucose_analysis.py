@@ -31,7 +31,7 @@ class NHANESGlucoseAnalyzer:
     Comprehensive analyzer for NHANES glucose and HbA1c prediction with fairness evaluation
     """
     
-    def __init__(self, data_dir="/Users/aakashsuresh/fairness/processed_data_nhanes_lab/"):
+    def __init__(self, data_dir="/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_lab/"):
         self.data_dir = data_dir
         self.df = None
         self.X = None

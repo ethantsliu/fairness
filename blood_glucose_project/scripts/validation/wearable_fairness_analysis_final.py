@@ -39,8 +39,8 @@ def load_sample_data(sample_size=5000):
     
     try:
         # Load glucose data first (smaller files)
-        glucose_2011 = pd.read_csv("/Users/aakashsuresh/fairness/processed_data_new/2011-2012_GLU_G.csv")
-        glucose_2013 = pd.read_csv("/Users/aakashsuresh/fairness/processed_data_new/2013-2014_GLU_H.csv")
+        glucose_2011 = pd.read_csv("/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/2011-2012_GLU_G.csv")
+        glucose_2013 = pd.read_csv("/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/2013-2014_GLU_H.csv")
         glucose = pd.concat([glucose_2011, glucose_2013], ignore_index=True)
         
         print(f"Glucose data: {glucose.shape}")
@@ -55,8 +55,8 @@ def load_sample_data(sample_size=5000):
         
         # Load accelerometry data for sampled participants only
         print("Loading accelerometry data...")
-        acc_2011 = pd.read_csv("/Users/aakashsuresh/fairness/processed_data_new/2011-2012_Accelerometry.csv")
-        acc_2013 = pd.read_csv("/Users/aakashsuresh/fairness/processed_data_new/2013-2014_Accelerometry.csv")
+        acc_2011 = pd.read_csv("/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/2011-2012_Accelerometry.csv")
+        acc_2013 = pd.read_csv("/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/2013-2014_Accelerometry.csv")
         
         # Filter to sampled participants
         acc_2011 = acc_2011[acc_2011['SEQN'].isin(glucose['SEQN'])]

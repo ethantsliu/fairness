@@ -23,7 +23,7 @@ class DietaryDataIntegrationInvestigator:
     
     def __init__(self):
         self.base_dir = "/Users/aakashsuresh/fairness"
-        self.processed_data_new = f"{self.base_dir}/processed_data_new"
+        self.processed_data_new = f"{self.base_dir}/blood_glucose_project/data/processed/nhanes_combined"
         self.output_dir = f"{self.base_dir}/blood_glucose_project/dietary_analysis"
         
         # Create output directory

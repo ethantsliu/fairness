@@ -26,10 +26,28 @@ def export_fairness_pdf(output_path):
         ),
         (
             _first_existing_path([
+                "/Users/aakashsuresh/fairness/blood_glucose_project/figures/age_error_relationship_lab.png"
+            ]),
+            "Lab Model: Age vs Error (Quadratic Fit)"
+        ),
+        (
+            _first_existing_path([
                 "/Users/aakashsuresh/fairness/blood_glucose_project/figures/lifestyle_fairness_evaluation.png",
                 "/Users/aakashsuresh/fairness/blood_glucose_project/results/figures/lifestyle_fairness_evaluation.png"
             ]),
             "Lifestyle Model Fairness (Bootstrap Error Bars)"
+        ),
+        (
+            _first_existing_path([
+                "/Users/aakashsuresh/fairness/blood_glucose_project/figures/age_error_relationship_lifestyle.png"
+            ]),
+            "Lifestyle Model: Age vs Error (Quadratic Fit)"
+        ),
+        (
+            _first_existing_path([
+                "/Users/aakashsuresh/fairness/blood_glucose_project/figures/lifestyle_subgroup_diagnostics.png"
+            ]),
+            "Lifestyle Model: Subgroup Diagnostics"
         ),
         (
             _first_existing_path([

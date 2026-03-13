@@ -27,8 +27,8 @@ def main():
     # Load data with error handling
     try:
         print("📊 Loading accelerometry data...")
-        acc_2011 = pd.read_csv("/Users/aakashsuresh/fairness/processed_data_new/2011-2012_Accelerometry.csv")
-        acc_2013 = pd.read_csv("/Users/aakashsuresh/fairness/processed_data_new/2013-2014_Accelerometry.csv")
+        acc_2011 = pd.read_csv("/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/2011-2012_Accelerometry.csv")
+        acc_2013 = pd.read_csv("/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/2013-2014_Accelerometry.csv")
         
         print(f"2011-2012 shape: {acc_2011.shape}")
         print(f"2013-2014 shape: {acc_2013.shape}")
@@ -39,8 +39,8 @@ def main():
         
         # Load glucose data
         print("📊 Loading glucose data...")
-        glucose_2011 = pd.read_csv("/Users/aakashsuresh/fairness/processed_data_new/2011-2012_GLU_G.csv")
-        glucose_2013 = pd.read_csv("/Users/aakashsuresh/fairness/processed_data_new/2013-2014_GLU_H.csv")
+        glucose_2011 = pd.read_csv("/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/2011-2012_GLU_G.csv")
+        glucose_2013 = pd.read_csv("/Users/aakashsuresh/fairness/blood_glucose_project/data/processed/nhanes_combined/2013-2014_GLU_H.csv")
         glucose = pd.concat([glucose_2011, glucose_2013], ignore_index=True)
         
         print(f"Glucose data shape: {glucose.shape}")
