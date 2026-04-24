@@ -4,7 +4,7 @@ Publication-quality figures for NPJ Digital Medicine / Nature Medicine.
 Also investigates WHY within-group label variability differs.
 
 Outputs:
-  figures/publication/fig1_study_overview.{pdf,png}
+  figures/publication/fig1_study_overview.{pdf,png}  (vertical walkthrough pipeline)
   figures/publication/fig2_heterogeneity.{pdf,png}
   figures/publication/fig3_variability_drivers.{pdf,png}
   figures/publication/fig4_mechanism.{pdf,png}
@@ -13,6 +13,8 @@ Outputs:
 """
 
 import os
+import re
+import textwrap
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -20,7 +22,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.patches as mpatches
-from matplotlib.backends.backend_pdf import PdfPages
 from scipy import stats
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -92,9 +93,20 @@ RACE_MAP_FLAT = {1.0: "Mexican American", 2.0: "Other Hispanic", 3.0: "NH White"
 GENDER_MAP = {1.0: "Male", 2.0: "Female"}
 
 
-def panel_label(ax, label, x=-0.14, y=1.06):
-    ax.text(x, y, label, transform=ax.transAxes,
-            fontsize=10, fontweight="bold", va="top", ha="left")
+def panel_label(ax, label):
+    """Upper-left panel letter in the outer margin (offset points), clear of subplot titles."""
+    ax.annotate(
+        label,
+        xy=(0, 1),
+        xycoords="axes fraction",
+        xytext=(-2, 22),
+        textcoords="offset points",
+        fontsize=10,
+        fontweight="bold",
+        ha="right",
+        va="bottom",
+        clip_on=False,
+    )
 
 
 def save_fig(fig, name):
@@ -203,85 +215,130 @@ def bootstrap_stat(values, stat_fn, n_boot=2000, seed=42):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# FIGURE 1: STUDY OVERVIEW (methods pipeline)
+# FIGURE 1: STUDY OVERVIEW (vertical walkthrough workflow)
 # ═══════════════════════════════════════════════════════════════════════════
+
+def _wrap_fig1_paragraphs(text, width):
+    """Hard-wrap each paragraph (blank-line separated); use Unicode symbols, not mathtext."""
+    paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    return "\n\n".join(
+        textwrap.fill(" ".join(p.split()), width=width, break_long_words=False, break_on_hyphens=True)
+        for p in paras
+    )
+
 
 def figure1_study_overview():
     set_nature_style()
-    fig, ax = plt.subplots(figsize=(7.2, 3.4))
+    fig, ax = plt.subplots(figsize=(7.2, 7.85))
     ax.set_xlim(0, 100)
-    ax.set_ylim(0, 34)
+    ax.set_ylim(0, 100)
     ax.axis("off")
 
-    arrow_kw = dict(arrowstyle="->,head_width=0.3,head_length=0.18",
-                    color="#444444", lw=1.0, connectionstyle="arc3,rad=0")
+    arrow_kw = dict(arrowstyle="->,head_width=0.35,head_length=0.2",
+                    color="#555555", lw=1.05, connectionstyle="arc3,rad=0")
 
-    def box(x, y, w, h, txt, fc="#EBF5FB", fs=6.5, fw="normal"):
-        r = mpatches.FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.35",
-                                     facecolor=fc, edgecolor="#444444", linewidth=0.7)
+    # Card clears step badge (circle ~x 5.5–13.5); text stays inside inner column.
+    x_card, w_card = 14.0, 84.0
+    pad_x = 2.35
+    x_text = x_card + pad_x
+    wrap_w = 52
+    cx = x_card + w_card / 2
+    r_step = 3.65
+    x_circ = 9.25
+
+    def step_badge(n, yc):
+        c = mpatches.Circle((x_circ, yc), r_step, facecolor="#FFFFFF", edgecolor="#333333",
+                            linewidth=1.0, zorder=5)
+        ax.add_patch(c)
+        ax.text(x_circ, yc, str(n), ha="center", va="center", fontsize=9.5,
+                fontweight="bold", color="#222222", zorder=6)
+
+    def walk_card(y, h, n, y_center, title, body, fc, body_fs=6.15):
+        top_inset = 0.55
+        title_fs = 8.0
+        r = mpatches.FancyBboxPatch(
+            (x_card, y), w_card, h,
+            boxstyle="round,pad=0.5",
+            facecolor=fc, edgecolor="#444444", linewidth=0.75, zorder=1,
+        )
         ax.add_patch(r)
-        ax.text(x + w / 2, y + h / 2, txt, ha="center", va="center",
-                fontsize=fs, fontweight=fw, linespacing=1.35)
+        step_badge(n, y_center)
+        title_wrapped = textwrap.fill(title, width=wrap_w - 2, break_long_words=False,
+                                      break_on_hyphens=True)
+        body_wrapped = _wrap_fig1_paragraphs(body, wrap_w)
+        y_title = y + h - top_inset
+        ax.text(x_text, y_title, title_wrapped, ha="left", va="top",
+                fontsize=title_fs, fontweight="bold", color="#1a1a1a", linespacing=1.22)
+        n_title_lines = title_wrapped.count("\n") + 1
+        # Approximate title depth in data coords (ylim 0–100, ~7.85 in tall).
+        title_depth = n_title_lines * 1.32 + 0.45
+        y_body = y_title - title_depth
+        ax.text(x_text, y_body, body_wrapped, ha="left", va="top",
+                fontsize=body_fs, color="#333333", linespacing=1.28)
 
-    def arrow(x1, y1, x2, y2, **kw):
-        props = {**arrow_kw, **kw}
-        ax.annotate("", xy=(x2, y2), xytext=(x1, y1), arrowprops=props)
+    def v_arrow(y_top, y_bot):
+        ax.annotate("", xy=(cx, y_bot), xytext=(cx, y_top), arrowprops=arrow_kw)
 
-    # ── ROW A: Data sources ──
-    y_a = 26.5
-    h_a = 5.5
-    box(2, y_a, 17, h_a, "NHANES\n2011-2014\nn = 4,162 adults", fc="#D5E8D4", fs=7, fw="bold")
-    box(22, y_a, 16, h_a, "Demographics\nAge, Gender, Race\nEducation, Income", fc="#DAE8FC")
-    box(41, y_a, 16, h_a, "Wearable\nAccelerometry\nActivity, Sedentary\nWear time", fc="#DAE8FC")
-    box(60, y_a, 16, h_a, "Lab Outcomes\nFasting Glucose\nHbA1c\n(targets only)", fc="#FFF2CC")
+    ax.text(50, 98.2, "Study pipeline (walkthrough)", ha="center", va="top",
+            fontsize=9.5, fontweight="bold", color="#222222")
 
-    ax.text(80, y_a + h_a + 0.8, "Data", fontsize=8.5, fontweight="bold", color="#444444")
+    gap = 2.15
 
-    # ── Arrows from data to analysis ──
-    y_mid = y_a - 1.5
-    for cx in [10.5, 30, 49, 68]:
-        arrow(cx, y_a, cx, y_mid)
+    y5, h5 = 6.0, 24.0
+    walk_card(
+        y5, h5, 5, y5 + h5 / 2,
+        "What the analyses show",
+        "Key finding — Population outcome SD explains R\u00b2 = 0.63 of subgroup MAE variation "
+        "(p < 10\u207b\u2075, n = 23 groups).\n\n"
+        "Controls — Sample-size association R\u00b2 \u2248 0.00; demographics ablation and a "
+        "mitigation pilot showed minimal or no meaningful effect.\n\n"
+        "Mechanism — Diabetes prevalence varies roughly 2–27% across subgroups, widening glucose "
+        "distributions and mechanically increasing prediction error.",
+        "#E8F4EA",
+    )
 
-    # ── ROW B: Analysis ──
-    y_b = 15
-    h_b = 6.5
-    box(2, y_b, 22, h_b,
-        "Lifestyle-Only\nPrediction Model\nRandom Forest (multi-output)\nNo lab inputs\n80/20 split",
-        fc="#E1D5E7", fs=6.5)
-    box(27, y_b, 22, h_b,
-        "Subgroup Fairness\nEvaluation\n5 demographic axes\n23 subgroups\nBootstrap 95% CIs",
-        fc="#F8CECC", fs=6.5)
-    box(52, y_b, 25, h_b,
-        "Heterogeneity\nDecomposition\nMAE vs. within-group outcome SD\nMAE vs. sample size (control)\nSpearman + OLS regression",
-        fc="#F8CECC", fs=6.5)
+    y4, h4 = y5 + h5 + gap, 12.8
+    walk_card(
+        y4, h4, 4, y4 + h4 / 2,
+        "Heterogeneity decomposition",
+        "Quantify how cross-subgroup MAE tracks within-group glucose dispersion versus sample "
+        "size (negative control), using Spearman correlation and OLS regression.",
+        "#FCE8E8",
+    )
 
-    ax.text(80, y_b + h_b + 1.2, "Analysis", fontsize=8.5, fontweight="bold", color="#444444")
+    y3, h3 = y4 + h4 + gap, 12.8
+    walk_card(
+        y3, h3, 3, y3 + h3 / 2,
+        "Subgroup fairness evaluation",
+        "Mean absolute error (MAE) on the held-out test set for 23 subgroups across five axes "
+        "(age, gender, race/ethnicity, education, income), each with bootstrap 95% CIs.",
+        "#FCE8E8",
+    )
 
-    arrow(24, y_b + h_b / 2, 27, y_b + h_b / 2)
-    arrow(49, y_b + h_b / 2, 52, y_b + h_b / 2)
+    y2, h2 = y3 + h3 + gap, 12.2
+    walk_card(
+        y2, h2, 2, y2 + h2 / 2,
+        "Lifestyle-only prediction model",
+        "Random forest (multi-output) predicts fasting glucose and HbA1c from lifestyle and "
+        "accelerometry features only — no laboratory predictors. Features standardized; 80/20 "
+        "train–test split.",
+        "#E8E0F0",
+    )
 
-    # merge data arrows into model
-    for cx in [10.5, 30, 49, 68]:
-        target_x = min(max(cx, 3), 23)
-        arrow(cx, y_mid, target_x, y_b + h_b)
+    y1, h1 = y2 + h2 + gap, 13.2
+    walk_card(
+        y1, h1, 1, y1 + h1 / 2,
+        "Data sources",
+        "NHANES 2011–2014: n = 4,162 adults (≥18y) with linked demographics (age, gender, "
+        "race/ethnicity, education, income), wearable-derived activity and sedentary time, and "
+        "lab fasting glucose and HbA1c (targets only — not used as model inputs).",
+        "#D5E8D4",
+    )
 
-    # ── ROW C: Key results ──
-    y_c = 3
-    h_c = 8
-    box(2, y_c, 30, h_c,
-        "Key Finding\n\nPopulation outcome SD\nexplains R$^2$ = 0.63 of\nsubgroup MAE variation\n(p < 10$^{-5}$, n = 23 groups)",
-        fc="#D5E8D4", fs=7, fw="bold")
-    box(35, y_c, 20, h_c,
-        "Controls\n\nSample size: R$^2$ = 0.00\nDemographics ablation:\nminimal effect\nMitigation pilot:\nineffective",
-        fc="#FFF2CC", fs=6.5)
-    box(58, y_c, 20, h_c,
-        "Mechanism\n\nDiabetes prevalence\nvaries 2-27% across\nsubgroups, shaping\noutcome distributions",
-        fc="#FFF2CC", fs=6.5)
-
-    ax.text(80, y_c + h_c + 0.8, "Results", fontsize=8.5, fontweight="bold", color="#444444")
-
-    for src_x, dst_x in [(13, 17), (38, 45), (64.5, 68)]:
-        arrow(src_x, y_b, dst_x, y_c + h_c)
+    v_arrow(y2, y3 + h3)
+    v_arrow(y3, y4 + h4)
+    v_arrow(y4, y5 + h5)
+    v_arrow(y1, y2 + h2)
 
     save_fig(fig, "fig1_study_overview")
 
@@ -407,7 +464,7 @@ def figure3_variability_drivers(full_df):
     df = assign_labels(full_df)
 
     fig = plt.figure(figsize=(7.2, 6.2))
-    gs = gridspec.GridSpec(2, 3, figure=fig, hspace=0.55, wspace=0.45)
+    gs = gridspec.GridSpec(2, 3, figure=fig, hspace=0.55, wspace=0.45, top=0.94)
 
     panel_slicings = [
         ("Age group", "age_group",
@@ -453,9 +510,14 @@ def figure3_variability_drivers(full_df):
 
         labs = [str(g) for g in groups]
         ax.set_xticks(range(len(groups)))
-        ax.set_xticklabels(labs, rotation=40, ha="right", fontsize=5.5)
+        ax.set_xticklabels(labs)
+        for lab in ax.get_xticklabels():
+            lab.set_rotation(40)
+            lab.set_ha("right")
+            lab.set_rotation_mode("anchor")
+            lab.set_fontsize(5.5)
         ax.set_ylabel("Fasting glucose (mg/dL)" if i == 0 else "")
-        ax.set_title(title, fontsize=8, fontweight="bold", pad=6)
+        ax.set_title(title, fontsize=8, fontweight="bold", pad=10)
         ax.set_ylim(50, 350)
         panel_label(ax, chr(97 + i))
 
@@ -495,9 +557,14 @@ def figure3_variability_drivers(full_df):
         ax2.spines["right"].set_color("#999")
 
         ax.set_xticks(x)
-        ax.set_xticklabels([str(g) for g in groups], rotation=40, ha="right", fontsize=5.5)
+        ax.set_xticklabels([str(g) for g in groups])
+        for lab in ax.get_xticklabels():
+            lab.set_rotation(40)
+            lab.set_ha("right")
+            lab.set_rotation_mode("anchor")
+            lab.set_fontsize(5.5)
         ax.set_ylabel("Diabetes prevalence (%)" if i == 0 else "")
-        ax.set_title(f"{title}", fontsize=8, fontweight="bold", pad=6)
+        ax.set_title(f"{title}", fontsize=8, fontweight="bold", pad=10)
         panel_label(ax, chr(100 + i))
 
     # Legend for dual axis
@@ -615,10 +682,13 @@ def figure4_mechanism(df_stats, full_df):
 
     ax_c.axhline(0, color="black", lw=0.6, ls="--", alpha=0.3)
     ax_c.set_xticks(positions)
-    ax_c.set_xticklabels([a.replace("/", "/\n") for a in axes_list],
-                          fontsize=5.5, rotation=30, ha="right")
+    ax_c.set_xticklabels([a.replace("/", "/\n") for a in axes_list], fontsize=5.5)
+    for lab in ax_c.get_xticklabels():
+        lab.set_rotation(30)
+        lab.set_ha("right")
+        lab.set_rotation_mode("anchor")
     ax_c.set_ylabel("Residual MAE (mg/dL)")
-    ax_c.set_title("After controlling for outcome SD", fontsize=7.5, pad=4)
+    ax_c.set_title("After controlling for outcome SD", fontsize=7.5, pad=10)
     panel_label(ax_c, "c")
 
     save_fig(fig, "fig4_mechanism")
@@ -722,17 +792,25 @@ def investigate_variability(full_df):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def combine_pdf():
+    """Merge per-figure vector PDFs so text stays editable and aligned (no PNG re-raster)."""
+    from pypdf import PdfReader, PdfWriter
+
     pdf_path = os.path.join(FIG_DIR, "all_figures.pdf")
-    with PdfPages(pdf_path) as pdf:
-        for name in ["fig1_study_overview", "fig2_heterogeneity",
-                     "fig3_variability_drivers", "fig4_mechanism"]:
-            img = plt.imread(os.path.join(FIG_DIR, name + ".png"))
-            fig, ax = plt.subplots(figsize=(10, 10 * img.shape[0] / img.shape[1]))
-            ax.imshow(img)
-            ax.axis("off")
-            pdf.savefig(fig, bbox_inches="tight")
-            plt.close(fig)
-    print(f"\n  Combined PDF: {pdf_path}")
+    names = [
+        "fig1_study_overview",
+        "fig2_heterogeneity",
+        "fig3_variability_drivers",
+        "fig4_mechanism",
+    ]
+    writer = PdfWriter()
+    for name in names:
+        part = os.path.join(FIG_DIR, name + ".pdf")
+        reader = PdfReader(part)
+        for page in reader.pages:
+            writer.add_page(page)
+    with open(pdf_path, "wb") as f:
+        writer.write(f)
+    print(f"\n  Combined PDF (vector merge): {pdf_path}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
