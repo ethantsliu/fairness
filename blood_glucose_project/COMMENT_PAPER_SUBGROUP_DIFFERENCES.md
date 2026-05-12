@@ -30,6 +30,29 @@ Our updated workflow therefore separates three questions:
 
 In this run, homogeneous-vs-heterogeneous comparison was computed for 6 stable age-by-sex groups, providing a direct diagnostic against “pooling is the sole cause” assumptions.
 
+### Methods: Homogeneous vs Heterogeneous Training Comparison
+The two paradigms differ only in *which rows the model is allowed to learn from*; the model class, feature set, target set, scaler, and seed are identical (`MultiOutputRegressor(RandomForestRegressor(n_estimators=200, random_state=42))`, glucose + HbA1c outputs, lifestyle + demographic features). Subgroups are the 6 stable strata defined by age bin (<40, 40–60, >60) × sex (F, M), retained when the stratum has \(n \geq 160\). Figure M1 summarizes the design.
+
+**Heterogeneous (pooled) training.** All participants are pooled regardless of subgroup. We make a single 80/20 split on the pooled data (random_state=42). One model is trained on the 80% pooled train set. For each subgroup g, we then take the intersection of the pooled 20% test rows with subgroup g (requiring at least 30 such rows) and compute glucose MAE on that slice — call it \(\mathrm{MAE}_{het}^{\,g}\). This mirrors the standard real-world practice of training a population model and asking how it performs in each subgroup.
+
+**Homogeneous (within-group) training.** For each subgroup g, we restrict to that subgroup's rows only, do an 80/20 split *inside* the subgroup (random_state=42, requiring at least 20 test rows), fit the same model class on the within-group train set, and evaluate on the within-group test set — call it \(\mathrm{MAE}_{hom}^{\,g}\). This mirrors a "specialist" model trained exclusively for subgroup g and removes any influence of other subgroups on what the model learns.
+
+**Why both, not one or the other.** Each paradigm answers a different question. \(\mathrm{MAE}_{het}^{\,g}\) tells us how a one-size-fits-all model performs on group g; this is the number a typical fairness audit reports. \(\mathrm{MAE}_{hom}^{\,g}\) tells us how well *any* model of this class can do on group g when nothing about other groups distorts the fit. The within-group MAE therefore approximates a per-subgroup difficulty ceiling: it bakes in (a) the subgroup's outcome spread and tail behavior, and (b) the strength of feature–glucose signal inside that group, but excludes pooling effects.
+
+**Diagnostic contrast.** For each subgroup we report
+\[
+\Delta_g \;=\; \mathrm{MAE}_{hom}^{\,g} \;-\; \mathrm{MAE}_{het}^{\,g}
+\]
+along with the within-group glucose SD. The sign of \(\Delta_g\) is the mechanism signal:
+
+- \(\Delta_g < 0\) (within-group beats pooled): pooling is genuinely hurting subgroup g — the feature-to-glucose mapping differs enough from the majority that the population model is mis-specified for this group. A specialized or stratified model is a defensible mitigation.
+- \(\Delta_g \approx 0\) (within-group ≈ pooled): the per-subgroup error gap is *not* caused by pooling. Even an oracle model trained only on group g can't do meaningfully better. The disparity is more consistent with irreducible subgroup outcome-structure differences (the diagnosis-first interpretation this paper argues for).
+- \(\Delta_g > 0\) (within-group worse than pooled): subgroup g is too small to learn from in isolation; the pooled model is borrowing strength from other groups. De-pooling would *increase*, not decrease, error for this group — a useful warning against reflexive "train one model per protected attribute" recipes.
+
+In the latest run this comparison ran across all 6 stable age-by-sex strata; the corresponding empirical bars are in `figures/publication/homogeneous_vs_mixed_training.png`. The methods schematic for the design itself is `figures/publication/methods_homogeneous_vs_heterogeneous.png` (Figure M1 below).
+
+![Figure M1. Methods schematic: homogeneous vs heterogeneous training.](figures/publication/methods_homogeneous_vs_heterogeneous.png)
+
 ### Updated Empirical Context from This Run
 Model-level prediction results (10-fold CV) remained in the expected lifestyle-only range:
 - Random Forest: glucose MAE 18.232 ± 1.305 mg/dL; HbA1c MAE 0.625 ± 0.055%
@@ -39,10 +62,11 @@ Model-level prediction results (10-fold CV) remained in the expected lifestyle-o
 These values indicate the task remains hard without glucose-adjacent proxy labs, reinforcing why subgroup difficulty differences should be expected and explicitly diagnosed.
 
 ### Figures Supporting the Revised Narrative
-The updated run generated three primary narrative figures:
+The updated run generated three primary narrative figures plus one methods schematic:
 - `figures/publication/outcome_heterogeneity_by_subgroups.png`
 - `figures/publication/overlay_age_vs_glucose.png`
 - `figures/publication/homogeneous_vs_mixed_training.png`
+- `figures/publication/methods_homogeneous_vs_heterogeneous.png` (methods schematic, Figure M1)
 
 Together, these move the paper from broad claims about heterogeneity toward an evidence chain anchored in subgroup contrasts and mechanism testing.
 
@@ -56,6 +80,7 @@ For fairness analysis in healthcare ML, we recommend:
 This sequence avoids over-correcting models for disparities that primarily reflect subgroup outcome structure rather than model discrimination.
 
 ## Suggested Figure Captions (Short Comment Format)
+- **Figure M1 (methods):** Schematic of the homogeneous vs heterogeneous training comparison. *Panel A:* heterogeneous (pooled) training — one model fit on all participants, then evaluated on the held-out test rows belonging to each age-by-sex subgroup. *Panel B:* homogeneous (within-group) training — a separate model fit and evaluated inside each subgroup, with no cross-subgroup data. *Panel C:* interpretation of \(\Delta_g = \mathrm{MAE}_{hom}^{g} - \mathrm{MAE}_{het}^{g}\): negative \(\Rightarrow\) pooling is hurting group g; near-zero \(\Rightarrow\) disparity is not pooling-driven and likely reflects intrinsic subgroup outcome structure; positive \(\Rightarrow\) group is too small to train alone and benefits from pooled borrowing of strength.
 - **Figure 1:** Subgroup outcome-distribution contrasts for glucose and HbA1c across demographic and socioeconomic axes.
 - **Figure 2:** Overlayed age versus glucose distribution showing subgroup trend divergence and overlap regions.
 - **Figure 3:** Group-wise comparison of homogeneous and heterogeneous training MAE for stable age-by-sex strata.
